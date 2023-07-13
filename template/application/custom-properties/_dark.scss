@@ -1,0 +1,41 @@
+$app: darker(#121f36, 10%);
+@mixin properties() {
+	--surface: #101625;
+	--primary: #ff8056;
+	--primary-dark: #e36152;
+	--primary-light: #ffa789;
+	--primary-accent: #e36152;
+	--text-on-primary: #fff;
+
+	--accent-color: #e36152;
+	//secondary colors
+	--secondary: #121f36;
+	--secondary-dark: #030405;
+	--secondary-darker: #0c1525;
+	--secondary-light: #617096;
+	--secondary-accent: #8e99bb;
+
+	--text-on-secondary: #ffffff;
+	--text-color: rgba(255, 255, 255, 0.9);
+	--text-title-color: var(--text-on-primary);
+	--text-second-color: var(--gray-dark);
+
+	--text-hover-color: var(--primary);
+	--bg-element: var(--secondary-dark);
+	--separator-color: var(--color-gray-10);
+	--app-recording-bg: rgba(0, 0, 0, 0.2);
+	--separator-color: var(--color-gray-10);
+
+	--surface-variant: #262626;
+	--surface: #1e1e1e;
+	--tertiary: #ff4081;
+	--secondary-variant: #018786;
+	--secondary-color: #03dac6;
+	--primary-color-variant: #6537ce;
+	--primary-color: #bb86fc;
+	--info-container: #2196f3;
+	--warning-container: #ffc107;
+	--success-container: #cf6679;
+	--background-color: #121212;
+	--success-container: #388e3c;
+}

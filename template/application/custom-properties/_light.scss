@@ -1,0 +1,41 @@
+@mixin properties() {
+  --surface: #fff;
+  --primary: #ff8056;
+  --primary-dark: #e36152;
+  --primary-light: #ffa789;
+  --primary-accent: #ffa789;
+  --text-on-primary: #fff;
+
+  --accent-color: var(--primary);
+  //secondary colors
+  --secondary: #121f36;
+  --secondary-dark: #121f36;
+  --secondary-light: #313c50;
+  --secondary-accent: #424f6e;
+  --text-on-secondary: #ffffff;
+
+  //background
+  --text-color: #000;
+  --text-title-color: var(--secondary-dark);
+  --text-second-color: var(--gray-dark);
+  --text-hover-color: var(--primary);
+  --app-recording-bg: darker(#121f36, 10%);
+  --separator-color: var(--color-gray-10);
+  --element-border-color: var(--gray-light);
+  --separator-color: var(--color-gray-10);
+
+  --on-background: #1f1f1f;
+  --surface-variant: #ebebeb;
+
+  --warning-container: #ffa900;
+  --error-container: #b00020;
+  --secondary-text-color: #757575;
+  --primary-text-color: #212121;
+  --surface: #ffffff;
+  --background: #f5f5f5;
+  --variante-tertiary: #e71d73;
+  --secondary-color-variant: #1a1652;
+  --secondary-color: #312783;
+  --primary-color-variant: #006ba6;
+  --primary-color: #009fe3;
+}

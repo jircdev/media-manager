@@ -1,0 +1,41 @@
+@use "dark";
+@use "light";
+@import "material-design";
+
+:root {
+  --font-family: "Roboto", sans-serif;
+  --secondary-font-family: "Roboto", sans-serif;
+  --bg-header: var(--secondary-background);
+  --gray-base: #000000;
+  --gray-darker: #333333;
+  --gray-dark: #5e5f5c;
+  --gray: #82837f;
+  --gray-light: #e4e5dc;
+  --success: #6aac7d;
+  --warning: #f7c700;
+  --error: #f04141;
+  --border-radius-base: 8px;
+  --border-radius-medium: 10px;
+  --app-footer-bg: rgba(0, 0, 0, 0.4);
+  --app-layer-bg: rgba(0, 0, 0, 0.8);
+  --app-max-width: 1024px;
+
+  --font-size-sm: 14px;
+  --font-size-base: 18px;
+  --font-size-lg: 25px;
+  --line-height-base: 1.8rem;
+  --line-height-lg: 2.5rem;
+
+  @include light.properties();
+  @media (prefers-color-scheme: dark) {
+    @include dark.properties();
+  }
+}
+
+html[data-beyond-mode="light"] {
+  @include light.properties();
+}
+
+html[data-beyond-mode="dark"] {
+  @include dark.properties();
+}

@@ -1,0 +1,9 @@
+{
+  "name": "main",
+  "code": {
+    "ts": {
+      "path": "/code/ts",
+      "files": ["*"]
+    }
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "uploader",
+  "ts": {
+    "path": "ts",
+    "files": [
+      "*"
+    ]
+  }
+}
