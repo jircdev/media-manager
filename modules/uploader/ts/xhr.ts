@@ -1,84 +1,110 @@
-import { PendingPromise } from '@beyond-js/kernel/core';
-import { ReactiveModel } from '@beyond-js/reactive/model';
+import {PendingPromise} from '@beyond-js/kernel/core';
+import {ReactiveModel} from '@beyond-js/reactive/model';
 
 export /*bundle */ class XHRLoader extends ReactiveModel<XHRLoader> {
-    private promise: PendingPromise<any>;
-    private uploaded: boolean;
-    private progress: number;
-    private error: boolean;
+	private promise: PendingPromise<any>;
+	private uploaded: boolean;
+	private progress: number;
+	private error: boolean;
 
-    constructor() {
-        super();
-        this.promise = undefined;
-        this.uploaded = false;
-        this.progress = 0;
-        this.error = false;
-    }
+	constructor() {
+		super();
+		this.promise = undefined;
+		this.uploaded = false;
+		this.progress = 0;
+		this.error = false;
+	}
 
-    get uploading(): boolean {
-        return !!this.promise;
-    }
+	#bearer;
+	bearer(bearer: string | undefined) {
+		if (bearer) this.#bearer = bearer;
+		return this;
+	}
 
-    get isUploaded(): boolean {
-        return this.uploaded;
-    }
+	get uploading(): boolean {
+		return !!this.promise;
+	}
 
-    get uploadProgress(): number {
-        return this.progress;
-    }
+	get isUploaded(): boolean {
+		return this.uploaded;
+	}
 
-    get hasError(): boolean {
-        return this.error;
-    }
+	get uploadProgress(): number {
+		return this.progress;
+	}
 
-    private onProgress(event: ProgressEvent): void {
-        if (event.lengthComputable) {
-            const percent = Math.round((event.loaded * 100) / event.total);
-            this.progress = parseInt(percent.toString());
-        }
+	get hasError(): boolean {
+		return this.error;
+	}
 
-        this.triggerEvent('change');
-    }
+	private onProgress(event: ProgressEvent): void {
+		if (event.lengthComputable) {
+			const percent = Math.round((event.loaded * 100) / event.total);
+			this.progress = parseInt(percent.toString());
+		}
 
-    private onCompleted(event: ProgressEvent): void {
-        this.uploaded = true;
-        this.promise.resolve();
-        this.triggerEvent('change');
+		this.triggerEvent('change');
+	}
 
-        setTimeout(() => {
-            this.promise = undefined;
-            this.triggerEvent('change');
-        }, 100);
-    }
+	private onCompleted(event: ProgressEvent): void {
+		this.uploaded = true;
+		this.promise.resolve();
+		this.triggerEvent('change');
 
-    private onError(event: ProgressEvent): void {
-        console.error('Error uploading picture', event);
-        this.error = true;
-        this.promise.reject();
-        this.triggerEvent('change');
-    }
+		setTimeout(() => {
+			this.promise = undefined;
+			this.triggerEvent('change');
+		}, 100);
+	}
 
-    private onAbort(): void {
-        this.promise.resolve(false);
-        this.triggerEvent('change');
-    }
+	private onError(event: ProgressEvent): void {
+		console.error('Error uploading picture', event);
+		this.error = true;
+		this.promise.reject();
+		this.triggerEvent('change');
+	}
 
-    public async upload(data: FormData, url: string): Promise<Response> {
-        try {
-            const specs = {
-                method: 'post',
-                body: data,
-            };
-            return fetch(url, specs);
-        } catch (e) {
-            console.error('error', e);
-        }
-    }
+	private onAbort(): void {
+		this.promise.resolve(false);
+		this.triggerEvent('change');
+	}
 
-    public abort(): void {
-        if (this.promise) {
-            this.promise.reject();
-            this.triggerEvent('change');
-        }
-    }
+	getHeaders = (specs: any): Headers => {
+		let headers: Headers = new Headers();
+
+		const bearer = specs.bearer || this.#bearer;
+
+		if (bearer) {
+			headers.append('Authorization', `Bearer ${bearer}`);
+		}
+		if (specs.bearer) delete specs.bearer;
+
+		const keys: string[] = Object.keys(specs);
+		keys.forEach((key: string): void => {
+			if (key === 'bearer') return;
+			headers.append(key, specs[key]);
+		});
+		return headers;
+	};
+
+	public async upload(data: FormData, url: string): Promise<Response> {
+		try {
+			let headers = this.getHeaders({});
+			const specs = {
+				method: 'post',
+				headers,
+				body: data,
+			};
+			return fetch(url, specs);
+		} catch (e) {
+			console.error('error', e);
+		}
+	}
+
+	public abort(): void {
+		if (this.promise) {
+			this.promise.reject();
+			this.triggerEvent('change');
+		}
+	}
 }
