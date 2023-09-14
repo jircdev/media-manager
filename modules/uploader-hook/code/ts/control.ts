@@ -1,7 +1,7 @@
 import * as React from 'react';
-import { Uploader } from '@aimpact/media-manager/uploader';
+import {Uploader} from '@bgroup/media-manager/uploader';
 
-export /*bundle*/ function useUploader({ url, name = 'file', multiple = false }) {
+export /*bundle*/ function useUploader({url, name = 'file', multiple = false}) {
 	const [uploader, setUploader] = React.useState();
 	const [fetching, setFetching] = React.useState();
 	const [total, setTotalFiles] = React.useState(0);

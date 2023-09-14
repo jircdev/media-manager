@@ -1,0 +1,38 @@
+.player__container {
+	position: relative;
+	display: inline-flex;
+	gap: 1rem;
+	// border: var(--outline) 1px solid;
+	align-items: center;
+	gap: 0.5rem;
+	background: var(--surface-container-lowest);
+	padding: 2px 0.5rem;
+	border-radius: var(--border-radius-base);
+	min-width: 250px;
+
+	&.player__container--preload {
+		opacity: 0.6;
+	}
+	.range__preload {
+		width: 100%;
+		display: flex;
+		border-top: 1px dotted var(--outline);
+	}
+}
+
+.audio__container {
+	display: flex;
+	flex-direction: column;
+
+	position: relative;
+
+	flex-grow: 1;
+	height: 100%;
+	.audio__thumb {
+		display: flex;
+		min-height: 42px;
+		align-items: center;
+	}
+
+	// border: 1px solid yellow;
+}
