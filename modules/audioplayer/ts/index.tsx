@@ -7,9 +7,8 @@ import {Timer} from './timer';
 import {Visualizer} from './visualizer';
 import {Preload} from './preload';
 
-export /*bundle*/ function AudioPlayer({src}) {
-	console.log(0.2, src);
-	const {ready, audioRef, error, audio, data, buffer} = useAudio(src);
+export /*bundle*/ function AudioPlayer({src, convert}) {
+	const {ready, audioRef, error, audio, data, buffer} = useAudio(src, convert);
 	const [playing, setPlaying] = React.useState(false);
 	const [currentTime, setCurrentTime] = React.useState(0);
 
@@ -32,7 +31,6 @@ export /*bundle*/ function AudioPlayer({src}) {
 
 	const onClick = event => {
 		const action = event.currentTarget.dataset.action;
-
 		actions[action](event);
 	};
 	const action = playing ? 'pause' : 'play';
@@ -41,6 +39,7 @@ export /*bundle*/ function AudioPlayer({src}) {
 		data,
 		playing,
 		buffer,
+		setPlaying,
 		currentTime,
 		setCurrentTime,
 	};

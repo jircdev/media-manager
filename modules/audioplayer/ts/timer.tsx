@@ -1,13 +1,14 @@
 import React from 'react';
-import { useTimer } from './hooks/use-timer';
-import { useComponentAudioContext } from './context';
+import {useTimer} from './hooks/use-timer';
+import {useComponentAudioContext} from './context';
 type TTime = number | string;
 export function Timer() {
 	const {
-		data: { duration: time },
+		data: {duration: time},
 		audio,
 	} = useComponentAudioContext();
 
+	if ([Infinity, undefined].includes(time)) return null;
 	const [timeToShow, setTimeToShow] = React.useState(time);
 
 	React.useEffect(() => {
@@ -31,23 +32,23 @@ export function Timer() {
 	const output = [];
 	if (hours > 0) {
 		output.push(
-			<span key='hours' className='timer__numbers timer__numbers--hours'>
+			<span key="hours" className="timer__numbers timer__numbers--hours">
 				{hours}
 			</span>
 		);
 	}
 	if (minutes < 10) minutes = '0' + minutes;
 	output.push(
-		<React.Fragment key='minutes'>
-			<span className='timer__numbers timer__number--minutes'>{minutes ?? '00'}</span>
-			<span className='timer__separator'>:</span>
+		<React.Fragment key="minutes">
+			<span className="timer__numbers timer__number--minutes">{minutes ?? '00'}</span>
+			<span className="timer__separator">:</span>
 		</React.Fragment>
 	);
 	if (seconds < 10) seconds = '0' + seconds;
 	output.push(
-		<span key='seconds' className='timer__numbers timer__number--seconds'>
+		<span key="seconds" className="timer__numbers timer__number--seconds">
 			{seconds ?? '00'}
 		</span>
 	);
-	return <section className='timer__container'>{output}</section>;
+	return <section className="timer__container">{output}</section>;
 }

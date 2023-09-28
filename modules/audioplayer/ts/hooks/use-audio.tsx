@@ -1,7 +1,7 @@
 import React from 'react';
 import {IAudioInterface} from '../types/IAudioInterface';
 
-type TResponse = {
+type Response = {
 	ready: boolean;
 	audio: HTMLAudioElement;
 	buffer: AudioBuffer;
@@ -10,16 +10,61 @@ type TResponse = {
 	error: Error;
 };
 
-export function useAudio(src): TResponse {
+export function useAudio(src, convert): Response {
 	const audioRef = React.useRef(null);
-	const [audio, setAudio] = React.useState<TResponse['audio']>(null);
+	const [audio, setAudio] = React.useState<Response['audio']>(null);
 	const [buffer, setBuffer] = React.useState<AudioBuffer>();
+	const [ready, setReady] = React.useState<boolean>();
 	const [data, setData] = React.useState<IAudioInterface>({src});
 	const [error, setError] = React.useState<Error>(false);
 	const ref = audioRef.current;
 
+	const getAudioContext = element => {
+		return new Promise((resolve, reject) => {
+			const audioContext = new AudioContext();
+			const reader = new FileReader();
+			reader.onload = () => {
+				const buffer = reader.result as ArrayBuffer;
+				audioContext
+					.decodeAudioData(buffer)
+					.then(buffer => {
+						resolve(audioContext);
+						setData({...data, duration: parseFloat(buffer.duration.toFixed(2))});
+						setBuffer(buffer);
+					})
+					.catch(error => {
+						reject(error);
+					});
+			};
+			reader.readAsArrayBuffer(element);
+		});
+	};
 	React.useEffect(() => {
 		try {
+			const isBlob = src instanceof Blob;
+			if (isBlob) {
+				const audio = new Audio();
+
+				audio.addEventListener('loadedmetadata', () => {
+					data.duration = parseFloat(audio.duration.toFixed(2));
+					data.fileName = src.name;
+
+					setData(data);
+					setAudio(audio);
+					getAudioContext(src).then(() => {
+						setReady(true);
+					});
+				});
+
+				audio.addEventListener('error', error => {
+					console.warn('error', error);
+					setError(true);
+				});
+				audio.src = URL.createObjectURL(src);
+				audio.load();
+				return;
+			}
+
 			fetch(src).then(async response => {
 				if (!response.ok) throw new Error(response.statusText);
 				const data: IAudioInterface = {src};
@@ -47,20 +92,19 @@ export function useAudio(src): TResponse {
 				});
 
 				audio.addEventListener('error', error => {
-					console.warn('error', error);
 					setError(true);
 				});
 				audio.src = src;
 				audio.load();
 			});
 		} catch (e) {
-			console.error(e.message);
+			console.error('capturado', e.message);
 			setError(true);
 		}
 	}, [src]);
 
 	return {
-		ready: audio && buffer,
+		ready,
 		audioRef: ref,
 		buffer,
 		audio,
