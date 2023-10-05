@@ -5,10 +5,13 @@
 	bottom: 0;
 	opacity: 0.5;
 	font-size: 0.55rem;
+	left: 0;
 	span.timer__numbers {
 		display: flex;
 		justify-content: center;
+
+		right: 0;
 		width: 0.55rem;
-		padding: 4px 0.2rem;
+		// padding: 4px 0.2rem;
 	}
 }

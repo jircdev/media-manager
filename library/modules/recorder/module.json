@@ -1,0 +1,7 @@
+{
+	"name": "recorder",
+	"ts": {
+		"path": "./",
+		"files": ["*"]
+	}
+}

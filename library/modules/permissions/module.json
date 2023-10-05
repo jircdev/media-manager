@@ -1,0 +1,9 @@
+{
+  "name": "permissions",
+  "ts": {
+    "path": "ts",
+    "files": [
+      "*"
+    ]
+  }
+}
