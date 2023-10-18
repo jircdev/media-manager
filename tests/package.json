@@ -6,6 +6,12 @@
 	"license": "ISC",
 	"layout": "main-layout",
 	"template": "template/template.json",
+	"libraries": {
+		"imports": [
+			"@bgroup/media-manager",
+			"@beyond-js/reactive"
+		]
+	},
 	"languages": {
 		"default": "en",
 		"supported": [
@@ -29,6 +35,11 @@
 		]
 	},
 	"dependencies": {
+		"@beyond-js/backend": "~0.1.7",
+		"@beyond-js/events": "^0.0.6",
+		"@beyond-js/local": "~0.1.3",
+		"dexie": "^3.2.3",
+		"uuid": "^9.0.0",
 		"@beyond-js/kernel": "~0.1.9",
 		"@beyond-js/react-18-widgets": "~1.0.1",
 		"socket.io-client": "^4.5.4",

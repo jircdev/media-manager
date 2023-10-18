@@ -1,9 +1,7 @@
 {
-  "name": "uploader",
-  "ts": {
-    "path": "ts",
-    "files": [
-      "*"
-    ]
-  }
+	"name": "uploader",
+	"platforms": ["browser", "web", "android", "ios"],
+	"bundle": "ts",
+	"path": "./",
+	"files": ["*"]
 }

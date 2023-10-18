@@ -1,12 +1,32 @@
 .page__container {
-	display: flex;
 	padding: 20px;
 	max-width: 1024px;
 	margin: 20px auto;
 	flex-direction: row;
 	background: var(--surface);
+}
 
-	.beyond {
-		color: #ff8056;
+.box__container {
+	padding: 2rem;
+	display: grid;
+	place-items: center;
+	background: rgba(0, 0, 0, 0.5);
+	border: 1px solid dotted var(--primary);
+	cursor: pointer;
+	transition: 300ms ease-in all;
+	&:hover {
+		background: rgba(0, 0, 0, 0.1);
+	}
+}
+
+ul {
+	list-style: none;
+	display: flex;
+	gap: 0.5rem;
+
+	img {
+		height: 150px;
+		object-fit: cover;
+		aspect-ratio: 1/1;
 	}
 }
