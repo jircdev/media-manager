@@ -115,10 +115,9 @@ export /*bundle*/ class Uploader extends ReactiveModel<IUploader> {
 		this.fetching = true;
 		this.triggerEvent(); // todo: fetching property need to fires this event
 		const target = event.currentTarget;
-		window.setTimeout(() => {
+		window.setTimeout(async () => {
 			this.#files.total = target.files.length;
-
-			this.#files.readLocal(target.files);
+			await this.#files.readLocal(target.files);
 			this.fetching = false;
 			this.triggerEvent(); // todo: fetching property need to fires this event
 		}, 0);

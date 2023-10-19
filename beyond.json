@@ -1,3 +1,8 @@
 {
-	"packages": ["./tests/package.json", "./library/package.json", "../../public/reactive-model/library/package.json"]
+	"packages": [
+		"./tests/client/package.json",
+		"./tests/server/package.json",
+		"./library/package.json",
+		"../../public/reactive-model/library/package.json"
+	]
 }

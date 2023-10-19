@@ -1,0 +1,39 @@
+ul {
+	list-style: none;
+	display: flex;
+	gap: 0.5rem;
+	padding: 0;
+	margin: 3rem 0;
+	.image__container,
+	.pui-image {
+		display: relative;
+		transition: 300ms ease-in all;
+		img {
+			height: 150px;
+			object-fit: cover;
+			aspect-ratio: 1/1;
+			transition: 300ms ease-in all;
+			z-index: 1;
+		}
+		figcaption {
+			position: absolute;
+			top: 0;
+			left: 0;
+			right: 0;
+			bottom: 0;
+			opacity: 0;
+			transition: 300ms ease-in all;
+			display: grid;
+			place-items: center;
+			z-index: 2;
+			cursor: pointer;
+		}
+
+		&:hover {
+			figcaption {
+				opacity: 1;
+				background: rgba(0, 0, 0, 0.5);
+			}
+		}
+	}
+}

@@ -1,4 +1,5 @@
-import { ReactiveModel } from '@beyond-js/reactive/model';
+import {PendingPromise} from '@beyond-js/kernel/core';
+import {ReactiveModel} from '@beyond-js/reactive/model';
 interface IFile {}
 export class BaseFile extends ReactiveModel<IFile> {
 	#loaded: number = 0;
@@ -34,6 +35,7 @@ export class BaseFile extends ReactiveModel<IFile> {
 		this.#type = specs.type ? specs.type : 'any';
 	}
 
+	// @todo: @jircdev add support for multiple files in extensible way
 	protected FILE_TYPE = Object.freeze({
 		document: [
 			'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -92,6 +94,8 @@ export class BaseFile extends ReactiveModel<IFile> {
 	};
 
 	#readFile = async (file: any) => {
+		const promise = new PendingPromise();
+
 		if (this.#type !== 'any') {
 			const isValid = await this.validate(file);
 			if (!isValid) {
@@ -102,9 +106,14 @@ export class BaseFile extends ReactiveModel<IFile> {
 
 		const reader = new FileReader();
 		reader.onload = event => this.#onload(event);
-		reader.onloadend = event => this.#onloadend(event, file);
+		reader.onloadend = event => {
+			this.#onloadend(event, file);
+			promise.resolve();
+		};
 		reader.onerror = event => this.#onerror(event);
 		reader.readAsDataURL(file);
+
+		return promise;
 	};
 
 	#validateLoad = () => {
