@@ -59,6 +59,7 @@ const draw = (canvas: HTMLCanvasElement, normalizedData: number[]): void => {
 };
 
 const filterData = audioBuffer => {
+	if (!audioBuffer) return [];
 	const rawData = audioBuffer.getChannelData(0); // We only need to work with one channel of data
 	const samples = 70; // Number of samples we want to have in our final data set
 	const blockSize = Math.floor(rawData.length / samples); // the number of samples in each subdivision
@@ -80,11 +81,11 @@ const visualize = (audioBuffer, selector) => {
 
 export function Visualizer() {
 	const {buffer} = useComponentAudioContext();
-
 	const ref = React.useRef(null);
 	React.useEffect(() => {
 		visualize(buffer, ref.current);
 	}, []);
+
 	return (
 		<>
 			<canvas ref={ref} />

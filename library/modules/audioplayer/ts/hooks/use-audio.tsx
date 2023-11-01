@@ -71,7 +71,9 @@ export function useAudio(src, convert): Response {
 
 				data.blob = await response.clone().blob();
 				try {
+					console.log(200, data.blob);
 					const audioContext = new AudioContext();
+
 					response.arrayBuffer().then(buffer => {
 						audioContext.decodeAudioData(buffer).then(audioBuffer => {
 							setBuffer(audioBuffer);
@@ -96,6 +98,8 @@ export function useAudio(src, convert): Response {
 				});
 				audio.src = src;
 				audio.load();
+				setAudio(audio);
+				setReady(true);
 			});
 		} catch (e) {
 			console.error('capturado', e.message);
@@ -103,6 +107,7 @@ export function useAudio(src, convert): Response {
 		}
 	}, [src]);
 
+	console.log(100, error, ready, audio);
 	return {
 		ready,
 		audioRef: ref,
