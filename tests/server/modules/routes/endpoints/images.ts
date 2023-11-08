@@ -31,25 +31,34 @@ interface IRequest extends Request {
 }
 
 export class Images {
-	static list(req, res) {}
+	static list(req: Request, res: Response) {
+		// TODO: Add logic to list images
+	}
+
+	static getOne(req: Request, res: Response) {
+		// TODO: Add logic to get a single image
+	}
 
 	static delete(req: Request, res: Response) {
-		//todo: add logic to delete
+		// TODO: Add logic to delete image
 	}
 
 	static upload(req: IRequest, res: Response) {
-		const files = req.files.map(file => file.filename);
+		const files = req.files.map((file: any) => file.filename);
 
 		res.json({
 			status: 'success',
 			data: {
+				album: 'default',
 				files,
 			},
 		});
 	}
-	
+
 	static setup(app: Application) {
 		app.get('/images', Images.list);
-		app.post('/upload', upload.array('images'), Images.upload);
+		app.get('/images/:id', Images.getOne); // For getting a single image
+		app.delete('/images/:id', Images.delete); // For deleting a single image
+		app.post('/images/upload', upload.array('images'), Images.upload); // renamed to uploadImages
 	}
 }

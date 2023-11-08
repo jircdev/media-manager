@@ -8,7 +8,7 @@ export class StoreManager implements IWidgetStore {
 	constructor() {
 		this.#uploader = new Uploader({
 			name: 'images',
-			url: 'http://localhost:5000/upload',
+			url: 'http://localhost:5000/images/upload',
 			multiple: true,
 		});
 	}

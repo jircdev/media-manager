@@ -3,6 +3,7 @@
 		"./tests/client/package.json",
 		"./tests/server/package.json",
 		"./library/package.json",
+		"../pragmate-ui/project/package.json",
 		"../../public/reactive-model/library/package.json"
 	]
 }
