@@ -18,7 +18,7 @@ function View({ store }): JSX.Element {
 	}, []);
 
 	useBinder([store.uploader], () => {
-		setFetching(store.uploader.fetching);
+		setFetching(store.fetching || store.uploader.fetching);
 		setItems(store.uploader.files?.items);
 	});
 
@@ -26,9 +26,7 @@ function View({ store }): JSX.Element {
 		event.preventDefault();
 		try {
 			setFetching(true);
-			await store.uploader.publish({
-				name: 'julio',
-			});
+			await store.upload();
 		} catch (e) {
 			setError({ status: true, message: e.message });
 		} finally {
