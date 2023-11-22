@@ -1,0 +1,98 @@
+openapi: '3.0.0'
+info:
+    version: '1.0.0'
+    title: 'Images API'
+    description: 'API for image management.'
+
+paths:
+    /images:
+        get:
+            summary: 'Get list of images'
+            operationId: 'listImages'
+            responses:
+                '200':
+                    description: 'Successful operation.'
+                    content:
+                        application/json:
+                            schema:
+                                type: 'array'
+                                items:
+                                    type: 'string' # Type of each item in the list. Adjust as necessary.
+                '400':
+                    description: 'Bad Request.'
+
+    /images/{id}:
+        get:
+            summary: 'Get a specific image'
+            operationId: 'getOneImage'
+            parameters:
+                - name: 'id'
+                  in: 'path'
+                  required: true
+                  schema:
+                      type: 'string' # Adjust the type as necessary.
+            responses:
+                '200':
+                    description: 'Successful operation.'
+                    content:
+                        application/json:
+                            schema:
+                                type: 'object' # Adjust as necessary.
+                '400':
+                    description: 'Bad Request.'
+                '404':
+                    description: 'Image not found.'
+
+        delete:
+            summary: 'Delete a specific image'
+            operationId: 'deleteImage'
+            parameters:
+                - name: 'id'
+                  in: 'path'
+                  required: true
+                  schema:
+                      type: 'string' # Adjust the type as necessary.
+            responses:
+                '204':
+                    description: 'Image successfully deleted.'
+                '400':
+                    description: 'Bad Request.'
+                '404':
+                    description: 'Image not found.'
+
+    /uploadImages:
+        post:
+            summary: 'Upload a set of images'
+            operationId: 'uploadImages'
+            requestBody:
+                content:
+                    multipart/form-data:
+                        schema:
+                            type: 'object'
+                            properties:
+                                images:
+                                    type: 'array'
+                                    items:
+                                        type: 'string'
+                                        format: 'binary'
+            responses:
+                '200':
+                    description: 'Successful operation.'
+                    content:
+                        application/json:
+                            schema:
+                                type: 'object'
+                                properties:
+                                    status:
+                                        type: 'string'
+                                    data:
+                                        type: 'object'
+                                        properties:
+                                            album:
+                                                type: 'string'
+                                            files:
+                                                type: 'array'
+                                                items:
+                                                    type: 'string'
+                '400':
+                    description: 'Bad Request.'
