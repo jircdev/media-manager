@@ -72,7 +72,6 @@ class Recorder extends ReactiveModel<Recorder> {
 	}
 
 	#onChangeStatus() {
-		console.log(12, this.#permissions.state);
 		this.#permissionState = this.#permissions.state;
 		this.trigger('change');
 	}
