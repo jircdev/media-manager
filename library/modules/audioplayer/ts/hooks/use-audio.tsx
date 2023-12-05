@@ -1,6 +1,6 @@
 import React from 'react';
 import {IAudioInterface} from '../types/IAudioInterface';
-
+import {PendingPromise} from '@beyond-js/kernel/core';
 type Response = {
 	ready: boolean;
 	audio: HTMLAudioElement;
@@ -48,7 +48,6 @@ export function useAudio(src, convert): Response {
 				audio.addEventListener('loadedmetadata', () => {
 					data.duration = parseFloat(audio.duration.toFixed(2));
 					data.fileName = src.name;
-
 					setData(data);
 					setAudio(audio);
 					getAudioContext(src).then(() => {
@@ -66,39 +65,55 @@ export function useAudio(src, convert): Response {
 			}
 
 			fetch(src).then(async response => {
-				if (!response.ok) throw new Error(response.statusText);
-				const data: IAudioInterface = {src};
+				const processAudio = async response => {
+					const data: IAudioInterface = {src};
+					data.blob = await response.clone().blob();
+					try {
+						const audioContext = new AudioContext();
 
-				data.blob = await response.clone().blob();
-				try {
-					const audioContext = new AudioContext();
-
-					response.arrayBuffer().then(buffer => {
-						audioContext.decodeAudioData(buffer).then(audioBuffer => {
-							setBuffer(audioBuffer);
+						response.arrayBuffer().then(buffer => {
+							audioContext
+								.decodeAudioData(buffer)
+								.then(audioBuffer => {
+									setBuffer(audioBuffer);
+								})
+								.catch(error => console.error('error decoding audio', error));
 						});
+					} catch (e) {
+						console.error('error getting audio', e);
+					}
+					data.url = URL.createObjectURL(data.blob);
+					const audio = new Audio();
+
+					audio.addEventListener('loadedmetadata', () => {
+						data.duration = parseFloat(audio.duration.toFixed(2));
+						data.fileName = src.split('/').pop();
+
+						setData(data);
+						setAudio(audio);
 					});
-				} catch (e) {
-					console.error('error getting audio', e);
-				}
-				data.url = URL.createObjectURL(data.blob);
-				const audio = new Audio();
 
-				audio.addEventListener('loadedmetadata', () => {
-					data.duration = parseFloat(audio.duration.toFixed(2));
-					data.fileName = src.split('/').pop();
-
-					setData(data);
+					audio.addEventListener('error', error => {
+						setError(true);
+					});
+					audio.src = src;
+					audio.load();
 					setAudio(audio);
-				});
+					setReady(true);
+				};
+				if (!response.ok) throw new Error(response.statusText);
 
-				audio.addEventListener('error', error => {
-					setError(true);
-				});
-				audio.src = src;
-				audio.load();
-				setAudio(audio);
-				setReady(true);
+				const responseClone = response.clone();
+				await responseClone
+					.json()
+					.then(data => {
+						if (!data.status) {
+							console.error('error', data.error);
+							return;
+						}
+						processAudio(response);
+					})
+					.catch(error => console.error(error?.message));
 			});
 		} catch (e) {
 			console.error('capturado', e.message);
