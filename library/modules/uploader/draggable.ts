@@ -14,7 +14,6 @@ export class DraggableUploader {
     onDrop = (event: DragEvent) => {
         event.preventDefault();
         const { dataTransfer } = event;
-        console.log(19, event);
         if (!dataTransfer.items.length) {
             return;
         }
@@ -25,7 +24,6 @@ export class DraggableUploader {
                 files.push(file);
             }
         }
-
         this.#files.readLocal(files);
     };
 

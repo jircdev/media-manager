@@ -67,7 +67,7 @@ export class BaseFile extends ReactiveModel<IFile> {
 	#onloadend = (event: any, file: any) => {
 		this.#loaded = this.#loaded + 1;
 
-		const name = file.name.replace(this.regExp, '');
+		const name = file.name;
 		file = this._items.get(name);
 
 		file.src = event.target.result;
@@ -88,14 +88,13 @@ export class BaseFile extends ReactiveModel<IFile> {
 		const isValid = !!this.FILE_TYPE[this.#type].find(item => item === file.type);
 
 		if (!isValid) {
-			this.#errors.push(file.name.replace(this.regExp, ''));
+			this.#errors.push(file.name);
 		}
 		return isValid;
 	};
 
 	#readFile = async (file: any) => {
 		const promise = new PendingPromise();
-
 		if (this.#type !== 'any') {
 			const isValid = await this.validate(file);
 			if (!isValid) {
@@ -112,7 +111,6 @@ export class BaseFile extends ReactiveModel<IFile> {
 		};
 		reader.onerror = event => this.#onerror(event);
 		reader.readAsDataURL(file);
-
 		return promise;
 	};
 
@@ -121,11 +119,23 @@ export class BaseFile extends ReactiveModel<IFile> {
 		}
 	};
 
+	validateExtension = (file: any, allowedExtensions: string[]) => {
+
+		const fileExtension = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+		const isValidExtension = allowedExtensions.includes(fileExtension);
+		
+		if (!isValidExtension) {
+			this.#errors.push(file.name);
+		}
+		
+		return isValidExtension;
+	};
+
 	clean = () => {
 		this._items = new Map();
 		this.#loaded = 0;
 
-		this.triggerEvent();
+		this.triggerEvent('items.loaded');
 	};
 
 	/**
@@ -138,13 +148,13 @@ export class BaseFile extends ReactiveModel<IFile> {
 		const promises = [];
 		for (let i = 0; i < fileList.length; ++i) {
 			const file = fileList[i];
-			this._items.set(file.name.replace(this.regExp, ''), file);
+			this._items.set(file.name, file);
 			promises.push(this.#readFile(file));
 		}
 
 		await Promise.all(promises);
-
 		this.fetching = false;
+		this.triggerEvent('items.loaded');
 		//@todo trigger remove
 	};
 }
