@@ -19,6 +19,10 @@ export /*bundle*/ class Uploader extends ReactiveModel<IUploader> {
 	#selector: HTMLElement;
 	#attrs;
 	#draggable;
+
+	get draggable() {
+		return this.#draggable;
+	}
 	#control: HTMLElement;
 	#specs;
 	#errors;
@@ -41,6 +45,7 @@ export /*bundle*/ class Uploader extends ReactiveModel<IUploader> {
 		this.#draggable = new DraggableUploader(this);
 		globalThis.up = this;
 		this.#files.on('change', this.#listenChanges);
+		this.#files.on('items.loaded', this.#updateItems);
 		this.#files.on('error', this.getErrors);
 		this.#files.on('loadend', this.filesLoaded);
 		const params = {...specs.input};
@@ -52,6 +57,7 @@ export /*bundle*/ class Uploader extends ReactiveModel<IUploader> {
 	#listenChanges = () => {
 		this.fetching = this.#files.fetching;
 		this.ready = this.#files.ready;
+		this.triggerEvent();
 	};
 	setAttributes = specs => {
 		if (!specs) specs = {};
@@ -71,9 +77,13 @@ export /*bundle*/ class Uploader extends ReactiveModel<IUploader> {
 		this.#attrs = attrs;
 	};
 
+	#updateItems = () => {
+		this.triggerEvent('items.loaded')
+	};
 	// };
 
 	openDialog = () => {
+		console.log(0.5, 'this');
 		this.#fileInput.click();
 	};
 	filesLoaded = () => this.triggerEvent('loadend');
@@ -83,13 +93,16 @@ export /*bundle*/ class Uploader extends ReactiveModel<IUploader> {
 
 	clean = async () => {
 		await this.#files.clean();
-		// await this.#mobileFiles.clean();
 	};
 
-	delete = async (fileName: string) => {
-		await this.#files.items.delete(fileName);
-		this.triggerEvent();
+	delete = (fileName: string) => {
+		this.#files.items.delete(fileName);
+		this.triggerEvent('item.delete');
 	};
+
+	isDrap = () => {
+		return this.#draggable.onDragOver();
+	}
 
 	create = (selector: HTMLElement, draggableSelector: HTMLElement | undefined) => {
 		if (mediaDevice.type === 'MOBILE') {
@@ -110,16 +123,13 @@ export /*bundle*/ class Uploader extends ReactiveModel<IUploader> {
 		if (draggableSelector) this.#draggable.add(draggableSelector);
 	};
 	#onChangeInput = async event => {
-		this.clean();
 
 		this.fetching = true;
-		this.triggerEvent(); // todo: fetching property need to fires this event
 		const target = event.currentTarget;
 		window.setTimeout(async () => {
 			this.#files.total = target.files.length;
 			await this.#files.readLocal(target.files);
 			this.fetching = false;
-			this.triggerEvent(); // todo: fetching property need to fires this event
 		}, 0);
 	};
 
@@ -142,7 +152,6 @@ export /*bundle*/ class Uploader extends ReactiveModel<IUploader> {
 			if (!params.hasOwnProperty(param)) continue;
 			form.append(param, params[param]);
 		}
-
 		const xhr = new XHRLoader();
 		const response = await xhr.upload(form, specs.url);
 		return response.json();
