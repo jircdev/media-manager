@@ -1,9 +1,0 @@
-{
-	"name": "uploader-code",
-	"description": "Uploader Component",
-	"bundle": "code",
-	"ts": {
-		"path": "/ts",
-		"files": ["*"]
-	}
-}
