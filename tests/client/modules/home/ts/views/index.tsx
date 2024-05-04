@@ -3,6 +3,7 @@ import { useBinder } from '@beyond-js/react-18-widgets/hooks';
 import { Images } from './images';
 import { Button } from 'pragmate-ui/components';
 import { Alert } from 'pragmate-ui/alert';
+import { useUploader } from './use-uploader';
 
 type Error = { status?: boolean; message?: string };
 export /*bundle*/
@@ -13,9 +14,7 @@ function View({ store }): JSX.Element {
 	const [error, setError] = React.useState<Error>({ status: true, message: 'no hay archivos' });
 
 	const [items, setItems] = React.useState([]);
-	React.useEffect(() => {
-		store.create(ref.current, draggable.current);
-	}, []);
+	const {ready, uploader, onSubmit} = useUploader();
 
 	useBinder([store.uploader], () => {
 		setFetching(store.fetching || store.uploader.fetching);

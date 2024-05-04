@@ -1,5 +1,5 @@
 import React from 'react';
-import {useTimer} from './hooks/use-timer';
+
 import {useComponentAudioContext} from './context';
 type TTime = number | string;
 export function Timer() {
