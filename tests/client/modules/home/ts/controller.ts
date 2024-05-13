@@ -1,7 +1,7 @@
 import { PageReactWidgetController } from '@beyond-js/react-18-widgets/page';
 import { StoreManager } from './store';
 import { View } from './views';
-
+	
 export /*bundle*/
 class Controller extends PageReactWidgetController {
 	#store: StoreManager;

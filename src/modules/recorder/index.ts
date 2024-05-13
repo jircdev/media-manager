@@ -1,7 +1,9 @@
 import {Events, PendingPromise} from '@beyond-js/kernel/core';
 import {ReactiveModel} from '@beyond-js/reactive/model';
 import {IRecorderSpecs} from './interface';
+
 export /*bundle */
+
 class Recorder extends ReactiveModel<Recorder> {
 	#initialised = false;
 	#source;
@@ -51,28 +53,43 @@ class Recorder extends ReactiveModel<Recorder> {
 		return this.#transcription;
 	}
 
-	async hasPermissions() {
-		return navigator.permissions.query({name: 'microphone' as any});
-	}
-
 	#promiseSpeech: PendingPromise<string>;
 
-	#permissions: PermissionStatus;
+	#permissions: boolean;
+	#permissionObserver;
 	#permissionState: 'granted' | 'denied' | 'prompt';
 	constructor() {
 		super();
 		this.init();
 	}
+	async hasPermissions(): Promise<boolean> {
+		try {
+			await navigator.mediaDevices.getUserMedia({audio: true});
 
+			return true;
+		} catch (e) {
+			console.log('aja');
+			this.#error = e;
+			return false;
+		}
+	}
 	async init() {
-		this.#permissions = await navigator.permissions.query({name: 'microphone' as any});
-		this.ready = true;
-		this.#permissionState = this.#permissions.state;
-		this.#permissions.onchange = this.#onChangeStatus.bind(this);
+		try {
+			const permissions = await navigator.permissions.query({name: 'microphone'} as any);
+			this.#permissions = permissions.state === 'granted';
+			this.#permissionObserver = permissions;
+			this.#permissionState = permissions.state;
+			permissions.onchange = this.#onChangeStatus.bind(this);
+		} catch (e) {
+			// the permissions.query microphone validation is not supported in safari and firefox
+			// this.#permissions = await this.getPermissions();
+		} finally {
+			this.ready = true;
+		}
 	}
 
 	#onChangeStatus() {
-		this.#permissionState = this.#permissions.state;
+		this.#permissionState = this.#permissionObserver.state;
 		this.trigger('change');
 	}
 
