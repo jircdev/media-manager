@@ -1,5 +1,5 @@
 import type { IWidgetStore } from '@beyond-js/widgets/controller';
-import { Uploader } from '@bgroup/media-manager/uploader';
+import { Uploader } from '@aimpact/media-manager/uploader';
 import { ReactiveModel } from '@beyond-js/reactive/model';
 
 export class StoreManager extends ReactiveModel implements IWidgetStore {

@@ -8,7 +8,7 @@
 	"template": "template/template.json",
 	"libraries": {
 		"imports": [
-			"@bgroup/media-manager",
+			"@aimpact/media-manager",
 			"pragmate-ui",
 			"@beyond-js/reactive"
 		]

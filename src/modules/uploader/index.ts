@@ -3,7 +3,7 @@ import {DraggableUploader} from './draggable';
 import {BaseFile} from './files/base';
 import {FilesUploader} from './files';
 import {XHRLoader} from './xhr';
-import {mediaDevice} from '@bgroup/media-manager/main';
+import {mediaDevice} from '@aimpact/media-manager/main';
 
 interface IUploader {
 	files: BaseFile;
