@@ -5,6 +5,11 @@
 	"description": "",
 	"license": "ISC",
 	"layout": "main-layout",
+	"libraries": {
+		"imports": [
+			"pragmate-ui"
+		]
+	},
 	"languages": {
 		"default": "en",
 		"supported": [
@@ -52,7 +57,7 @@
 	},
 	"dependencies": {
 		"@beyond-js/backend": "~0.1.4",
-		"@beyond-js/events": "^0.0.6",
+		"@beyond-js/events": "^0.0.7",
 		"@beyond-js/kernel": "~0.1.9",
 		"@beyond-js/local": "~0.1.3",
 		"@beyond-js/react-18-widgets": "^1.1.2",
