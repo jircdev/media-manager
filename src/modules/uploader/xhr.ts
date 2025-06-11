@@ -1,5 +1,5 @@
 import { ReactiveModel } from '@beyond-js/reactive/model';
-import { PendingPromise } from '@beyond-js/pending-promise/main';
+import { PendingPromise } from '@beyond-js/kernel/core';
 
 /* ──────────────────────────── tipos auxiliares ─────────────────────────── */
 
