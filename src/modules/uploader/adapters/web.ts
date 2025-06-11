@@ -1,4 +1,4 @@
 import { ReactiveModel } from '@beyond-js/reactive/model';
-import { BaseFile } from './base';
+import { BaseFilesList } from './base';
 
-export class WebFilesUploader extends BaseFile {}
+export class WebFilesUploader extends BaseFilesList {}

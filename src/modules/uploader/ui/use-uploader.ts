@@ -6,8 +6,9 @@
 */
 import * as React from 'react';
 
-import { UploaderEvents, IUploaderSpecs } from './types';
-import { Uploader } from './index';
+import { UploaderEvents, IUploaderSpecs } from '../types';
+import { Uploader } from '../index';
+import { BaseFilesList } from '../adapters/base';
 
 interface UseUploaderReturn {
 	triggerRef: React.RefObject<HTMLElement>;
@@ -16,6 +17,7 @@ interface UseUploaderReturn {
 	uploading: boolean;
 	progress: number; // 0-100
 	errors: string[];
+	files: BaseFilesList;
 }
 
 /**
@@ -56,5 +58,5 @@ export /*bundle*/ function useUploader(specs: IUploaderSpecs): UseUploaderReturn
 	/* Helper to trigger the upload */
 	const publish = React.useCallback((extra: Record<string, any> = {}) => uploader.publish(extra), [uploader]);
 
-	return { triggerRef, dropZoneRef, publish, uploading, progress, errors };
+	return { triggerRef, dropZoneRef, publish, uploading, progress, errors, files: uploader.files };
 }

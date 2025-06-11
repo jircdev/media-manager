@@ -2,15 +2,15 @@
 import { DraggableUploader } from './ui/draggable';
 import { ReactiveModel } from '@beyond-js/reactive/model';
 import { FilesUploader } from './adapters';
-import { BaseFile } from './adapters/base';
+import { BaseFilesList } from './adapters/base';
 import { IUploaderSpecs, UploaderEvents } from './types';
 import { XHRLoader } from './xhr';
 
 interface IUploader {
-	files: BaseFile;
+	files: BaseFilesList;
 }
 export /*bundle*/ class Uploader extends ReactiveModel<IUploader> {
-	#files: BaseFile;
+	#files: BaseFilesList;
 	#fileInput = document.createElement('input');
 	#draggable;
 	#attrs;
@@ -127,6 +127,7 @@ export /*bundle*/ class Uploader extends ReactiveModel<IUploader> {
 		this.trigger('change'); // todo: fetching property need to fires this event
 		const target = event.currentTarget;
 		window.setTimeout(async () => {
+			console.log('si');
 			this.#files.total = target.files.length;
 			await this.#files.readLocal(target.files);
 			this.fetching = false;

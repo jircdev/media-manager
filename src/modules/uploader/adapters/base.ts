@@ -7,7 +7,7 @@ export interface IFileItem {
 }
 
 interface IFile {}
-export class BaseFile extends ReactiveModel<IFile> {
+export class BaseFilesList extends ReactiveModel<IFile> {
 	#loaded: number = 0;
 
 	#specs: any;
@@ -25,14 +25,16 @@ export class BaseFile extends ReactiveModel<IFile> {
 		if (value === this._total) return;
 		this._total = value;
 	}
-	protected _items = new Map<string, IFileItem>();
-
-	get items(): Map<string, IFileItem> {
-		return this._items;
+	#map = new Map<string, IFileItem>();
+	get map() {
+		return this.#map;
+	}
+	get items(): IFileItem[] {
+		return [...this.#map.values()];
 	}
 
 	get entries(): IFileItem[] {
-		return [...this._items.values()];
+		return [...this.#map.values()];
 	}
 
 	constructor(parent: any, specs: any) {
@@ -107,41 +109,41 @@ export class BaseFile extends ReactiveModel<IFile> {
 		if (this.#type !== 'any') {
 			const isValid = this.validateFile(file);
 			if (!isValid) {
-				this.triggerEvent('validation:error', { file, reason: 'invalid-type' });
+				this.trigger('validation:error', { file, reason: 'invalid-type' });
 				return;
 			}
 		}
 
 		const name = file.name.replace(INVALID_CHARS, '');
 		// Limpiar src anterior si existe
-		const prev = this._items.get(name);
+		const prev = this.#map.get(name);
 		if (prev && prev.src) URL.revokeObjectURL(prev.src);
 
 		const src = URL.createObjectURL(file);
-		this._items.set(name, { file, src });
+		this.#map.set(name, { file, src });
 		this.#loaded++;
 
-		this.triggerEvent('file:loaded', { file, src });
+		this.trigger('file:loaded', { file, src });
 		// Revocar el objectURL tras emitir file:loaded si no se necesita la vista previa
 		URL.revokeObjectURL(src);
-		if (this.#loaded === this._items.size) {
-			this.triggerEvent('all:loaded', { files: this.entries });
+		if (this.#loaded === this.#map.size) {
+			this.trigger('all:loaded', { files: this.entries });
 		}
 	};
 
 	#validateLoad = () => {
-		if (this.#loaded === this._items.size) {
+		if (this.#loaded === this.#map.size) {
 		}
 	};
 
 	clean = () => {
 		// Liberar los objectURL creados
-		for (const item of this._items.values()) {
+		for (const item of this.#map.values()) {
 			if (item.src) URL.revokeObjectURL(item.src);
 		}
-		this._items = new Map();
+		this.#map = new Map();
 		this.#loaded = 0;
-		this.triggerEvent('clean');
+		this.trigger('clean');
 	};
 
 	/**
