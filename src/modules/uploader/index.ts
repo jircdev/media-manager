@@ -1,50 +1,41 @@
-import {ReactiveModel} from '@beyond-js/reactive/model';
-import {DraggableUploader} from './draggable';
-import {BaseFile} from './files/base';
-import {FilesUploader} from './files';
-import {XHRLoader} from './xhr';
-import {mediaDevice} from '@aimpact/media-manager/main';
+import { mediaDevice } from '@aimpact/media-manager/main';
+import { ReactiveModel } from '@beyond-js/reactive/model';
+import { DraggableUploader } from './draggable';
+import { FilesUploader } from './adapters';
+import { BaseFile } from './adapters/base';
+import { XHRLoader } from './xhr';
+import { IUploaderSpecs, IUploaderEvents, UploaderEvents } from './types';
 
 interface IUploader {
 	files: BaseFile;
 }
 export /*bundle*/ class Uploader extends ReactiveModel<IUploader> {
 	#files: BaseFile;
-
+	#fileInput = document.createElement('input');
+	#draggable;
+	#attrs;
+	#selector: HTMLElement;
+	#specs;
+	#errors;
 	get files() {
 		return this.#files;
 	}
 
-	#fileInput = document.createElement('input');
-	#selector: HTMLElement;
-	#attrs;
-	#draggable;
-	#control: HTMLElement;
-	#specs;
-	#errors;
 	get errors() {
 		return this.#errors;
 	}
 
-	constructor(specs: any = {}) {
+	constructor(specs: IUploaderSpecs = {} as IUploaderSpecs) {
 		super();
-
 		if (!specs.input) specs.input = {};
-
-		/**
-		 * Manager of the files
-		 * @type {UploadFiles}
-		 */
-
 		this.#files = FilesUploader.getInstance(this, specs);
-
-		this.#draggable = new DraggableUploader(this);
-		globalThis.up = this;
-		this.#files.on('change', this.#listenChanges);
-		this.#files.on('error', this.getErrors);
-		this.#files.on('loadend', this.filesLoaded);
-		const params = {...specs.input};
-		if (specs.hasOwnProperty('multiple')) params.multiple = specs.multiple;
+		this.#draggable = new DraggableUploader(this, this.#files);
+		// globalThis.up = this; // Eliminado
+		this.#files.on(UploaderEvents.Change, this.#listenChanges);
+		this.#files.on(UploaderEvents.Error, this.getErrors);
+		this.#files.on(UploaderEvents.LoadEnd, this.filesLoaded);
+		const params = { ...specs.input };
+		params.multiple = specs.multiple ?? false;
 		this.#specs = specs;
 		this.setAttributes(params);
 	}
@@ -53,32 +44,52 @@ export /*bundle*/ class Uploader extends ReactiveModel<IUploader> {
 		this.fetching = this.#files.fetching;
 		this.ready = this.#files.ready;
 	};
-	setAttributes = specs => {
+	setAttributes = (specs: Partial<HTMLInputElement> & { multiple?: boolean }) => {
 		if (!specs) specs = {};
-
 		let attrs = {
 			type: 'file',
 			style: 'display:none',
 			name: 'input_upload',
-			...specs,
+			...specs
 		};
-		if (attrs.multiple) this.#fileInput.accept = 'directory/*';
-
+		this.#fileInput.multiple = specs.multiple ?? false;
 		for (let prop in attrs) {
 			this.#fileInput.setAttribute(prop, attrs[prop]);
 		}
-
 		this.#attrs = attrs;
 	};
 
-	// };
+	// Métodos públicos
+
+	destroy = () => {
+		// Limpiar listeners y referencias
+		if (this.#selector) {
+			this.#selector.removeEventListener('click', this.openDialog);
+		}
+		this.#fileInput.removeEventListener('change', this.#onChangeInput);
+		if (this.#draggable && typeof this.#draggable.remove === 'function') {
+			this.#draggable.remove();
+		}
+		this.#files.off(UploaderEvents.Change, this.#listenChanges);
+		this.#files.off(UploaderEvents.Error, this.getErrors);
+		this.#files.off(UploaderEvents.LoadEnd, this.filesLoaded);
+		this.#selector = undefined;
+		this.#draggable = undefined;
+		this.#attrs = undefined;
+		this.#specs = undefined;
+		this.#errors = undefined;
+	};
+
+	// Opcional: Exponer métodos para chunked upload y retries en el futuro
+	// Ejemplo de firma:
+	// async uploadChunked(files: File[], options: { chunkSize: number, retries: number }) {}
 
 	openDialog = () => {
 		this.#fileInput.click();
 	};
-	filesLoaded = () => this.triggerEvent('loadend');
-	pictureLoaded = () => this.triggerEvent('pictureLoaded');
-	pictureLoading = () => this.triggerEvent('pictureLoading');
+	filesLoaded = () => this.trigger(UploaderEvents.LoadEnd);
+	pictureLoaded = () => this.trigger(UploaderEvents.PictureLoaded);
+	pictureLoading = () => this.trigger(UploaderEvents.PictureLoading);
 	getErrors = () => (this.#errors = this.files.errors);
 
 	clean = async () => {
@@ -88,7 +99,7 @@ export /*bundle*/ class Uploader extends ReactiveModel<IUploader> {
 
 	delete = async (fileName: string) => {
 		await this.#files.items.delete(fileName);
-		this.triggerEvent();
+		this.trigger('change');
 	};
 
 	create = (selector: HTMLElement, draggableSelector: HTMLElement | undefined) => {
@@ -113,38 +124,41 @@ export /*bundle*/ class Uploader extends ReactiveModel<IUploader> {
 		this.clean();
 
 		this.fetching = true;
-		this.triggerEvent(); // todo: fetching property need to fires this event
+		this.trigger('change'); // todo: fetching property need to fires this event
 		const target = event.currentTarget;
 		window.setTimeout(async () => {
 			this.#files.total = target.files.length;
 			await this.#files.readLocal(target.files);
 			this.fetching = false;
-			this.triggerEvent(); // todo: fetching property need to fires this event
+			this.trigger('change'); // todo: fetching property need to fires this event
 		}, 0);
 	};
 
 	publish = async (additionalParams = {}) => {
-		const form = new FormData();
-		//const collection = isCamera ? mobileFiles : files;
-		const collection = this.#files;
-
-		const specs = this.#specs;
-		const name = collection.total > 1 ? `${specs.name}` : specs.name;
-
-		const items = collection.entries.map(item => item);
-		form.append(name, JSON.stringify(items));
-		collection.entries.forEach(item => form.append(name, item));
-
-		if (!specs.params) specs.params = {};
-		const params = {...specs.params, ...additionalParams};
-
-		for (let param in params) {
-			if (!params.hasOwnProperty(param)) continue;
-			form.append(param, params[param]);
-		}
-
+		const form = this.buildFormData(additionalParams);
+		const specs: IUploaderSpecs = this.#specs;
 		const xhr = new XHRLoader();
+		// Aquí se podría implementar lógica para chunked upload y retries si specs.chunked está activo
 		const response = await xhr.upload(form, specs.url);
 		return response.json();
+	};
+
+	buildFormData = (additionalParams = {}): FormData => {
+		const form = new FormData();
+		const collection = this.#files;
+		const specs: IUploaderSpecs = this.#specs;
+		const name = collection.total > 1 ? `${specs.name}` : specs.name;
+		// Adjuntar archivos individualmente con su nombre
+		collection.entries.forEach(item => form.append(name, item.file, item.file.name));
+		// Adjuntar metadatos como JSON
+		form.append(
+			'metadata',
+			JSON.stringify({
+				files: collection.entries.map(f => f.file.name),
+				...specs.params,
+				...additionalParams
+			})
+		);
+		return form;
 	};
 }
