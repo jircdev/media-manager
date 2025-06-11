@@ -1,10 +1,10 @@
-import { mediaDevice } from '@aimpact/media-manager/main';
+// import { mediaDevice } from '@aimpact/media-manager/main';
+import { DraggableUploader } from './ui/draggable';
 import { ReactiveModel } from '@beyond-js/reactive/model';
-import { DraggableUploader } from './draggable';
 import { FilesUploader } from './adapters';
 import { BaseFile } from './adapters/base';
+import { IUploaderSpecs, UploaderEvents } from './types';
 import { XHRLoader } from './xhr';
-import { IUploaderSpecs, IUploaderEvents, UploaderEvents } from './types';
 
 interface IUploader {
 	files: BaseFile;
@@ -103,9 +103,9 @@ export /*bundle*/ class Uploader extends ReactiveModel<IUploader> {
 	};
 
 	create = (selector: HTMLElement, draggableSelector: HTMLElement | undefined) => {
-		if (mediaDevice.type === 'MOBILE') {
-			selector.addEventListener('click', mediaDevice.openGallery);
-		}
+		// if (mediaDevice.type === 'MOBILE') {
+		// 	selector.addEventListener('click', mediaDevice.openGallery);
+		// }
 		this.#selector = selector;
 		/**
 		 * Adds de click and change events into the input file

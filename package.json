@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "@beyond-js/reactive": "^2.0.5"
+  }
+}
