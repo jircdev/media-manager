@@ -1,0 +1,625 @@
+/**
+ * File: draggable.ts
+ */
+import {ReactiveModel} from '@beyond-js/reactive/model';
+import type {Uploader} from '.';
+import type {WebFilesUploader} from './files/web';
+
+export class DraggableUploader {
+	#parent: Uploader;
+	#files: WebFilesUploader;
+
+	constructor(parent: any) {
+		this.#parent = parent;
+		this.#files = parent.files;
+	}
+
+	onDrop = (event: DragEvent) => {
+		event.preventDefault();
+		const {dataTransfer} = event;
+
+		if (!dataTransfer.items.length) {
+			return;
+		}
+		const files: File[] = [];
+		for (let i = 0; i < dataTransfer.items.length; ++i) {
+			const file = dataTransfer.items[i].getAsFile();
+			if (file) {
+				files.push(file);
+			}
+		}
+
+		this.#files.readLocal(files);
+	};
+
+	/**
+	 * This event runs only when are files on the draggable area.
+	 * @param event
+	 */
+	onDragOver = (event: DragEvent) => {
+		event.preventDefault();
+	};
+
+	/**
+	 * Add the drag & drop events to the control
+	 * @param {HTMLInputElement} selector
+	 */
+	add(selector: HTMLInputElement) {
+		selector.ondrop = this.onDrop;
+		selector.ondragover = this.onDragOver;
+	}
+}
+
+/**
+ * File: files\base.ts
+ */
+import {PendingPromise} from '@beyond-js/kernel/core';
+import {ReactiveModel} from '@beyond-js/reactive/model';
+interface IFile {}
+export class BaseFile extends ReactiveModel<IFile> {
+	#loaded: number = 0;
+
+	#specs: any;
+	#type: string;
+	private regExp = /[^\w\d.]/g;
+	#errors: any[] = [];
+	get errors() {
+		return this.#errors;
+	}
+	protected _total: number = 0;
+	get total() {
+		return this._total;
+	}
+	set total(value) {
+		if (value === this._total) return;
+		this._total = value;
+	}
+	protected _items = new Map();
+
+	get items() {
+		return this._items;
+	}
+
+	get entries() {
+		return [...this._items.values()];
+	}
+
+	constructor(parent: any, specs: any) {
+		super();
+		this.#specs = specs;
+		this.#type = specs.type ? specs.type : 'any';
+	}
+
+	// @todo: @jircdev add support for multiple files in extensible way
+	protected FILE_TYPE = Object.freeze({
+		document: [
+			'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+			'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+			'text/plain',
+			'application/pdf',
+		],
+		image: ['image/png', 'image/jpeg', 'image/gif'],
+		json: ['application/json'],
+		zip: ['application/x-zip-compressed'],
+		audio: [
+			'audio/mpeg', // MP3 files
+			'audio/ogg', // Ogg Vorbis files
+			'audio/wav', // WAV files
+			'audio/webm', // WebM audio files
+			'audio/aac', // AAC files
+			'audio/flac', // FLAC files
+			'audio/x-m4a', // mp4 files, older version
+		],
+	});
+
+	#onload = (event: any) => {
+		event.target.removeEventListener('load', this.#onload);
+		if (this.#specs.onload && typeof this.#specs.onload === 'function') {
+			this.#specs.onload(event);
+		}
+	};
+
+	#onloadend = (event: any, file: any) => {
+		this.#loaded = this.#loaded + 1;
+
+		const name = file.name.replace(this.regExp, '');
+		file = this._items.get(name);
+
+		file.src = event.target.result;
+
+		this._items.set(name, file);
+
+		event.target.removeEventListener('onloadend', this.#onloadend);
+		this.triggerEvent('file.loaded');
+		if (this.#loaded === this._items.size) this.triggerEvent('loadend');
+		if (this.#specs.onloadend && typeof this.#specs.onloadend === 'function') {
+			this.#specs.onload(event);
+		}
+	};
+
+	#onerror = (event: any) => console.error(4, event);
+
+	validate = (file: any) => {
+		const isValid = !!this.FILE_TYPE[this.#type].find(item => item === file.type);
+
+		if (!isValid) {
+			this.#errors.push(file.name.replace(this.regExp, ''));
+		}
+		return isValid;
+	};
+
+	#readFile = async (file: any) => {
+		const promise = new PendingPromise();
+
+		if (this.#type !== 'any') {
+			const isValid = await this.validate(file);
+			if (!isValid) {
+				this.triggerEvent('error');
+				return;
+			}
+		}
+
+		const reader = new FileReader();
+		reader.onload = event => this.#onload(event);
+		reader.onloadend = event => {
+			this.#onloadend(event, file);
+			promise.resolve();
+		};
+		reader.onerror = event => this.#onerror(event);
+		reader.readAsDataURL(file);
+
+		return promise;
+	};
+
+	#validateLoad = () => {
+		if (this.#loaded === this._items.size) {
+		}
+	};
+
+	clean = () => {
+		this._items = new Map();
+		this.#loaded = 0;
+
+		this.triggerEvent();
+	};
+
+	/**
+	 *
+	 * @param fileList
+	 */
+	readLocal = async (fileList: File[]) => {
+		this.fetching = true;
+
+		const promises = [];
+		for (let i = 0; i < fileList.length; ++i) {
+			const file = fileList[i];
+			this._items.set(file.name.replace(this.regExp, ''), file);
+			promises.push(this.#readFile(file));
+		}
+
+		await Promise.all(promises);
+
+		this.fetching = false;
+		//@todo trigger remove
+	};
+}
+
+/**
+ * File: files\index.ts
+ */
+import {ReactiveModel} from '@beyond-js/reactive/model';
+import {MobileFilesUploader} from './mobile';
+import {WebFilesUploader} from './web';
+
+export class FilesUploader extends ReactiveModel<FilesUploader> {
+	static #instance;
+
+	static getInstance(parent, specs) {
+		if (this.#instance) return this.#instance;
+		if (globalThis.phonegap) return new MobileFilesUploader(parent);
+		return new WebFilesUploader(parent, specs);
+	}
+}
+
+/**
+ * File: files\mobile.ts
+ */
+import {ReactiveModel} from '@beyond-js/reactive/model';
+
+export class MobileFilesUploader extends ReactiveModel<MobileFilesUploader> {
+	private _loaded: number = 0;
+	private files = new Map();
+	private base64?: string;
+	private _specs: any;
+	private _errors: any[] = [];
+
+	constructor(specs: any) {
+		super();
+		this._specs = specs;
+	}
+
+	clean = () => {
+		this.files = new Map();
+		this._loaded = 0;
+	};
+
+	getFiles = async (data: any) => {
+		this.clean();
+
+		this.base64 = data.url;
+		this.triggerEvent('loading');
+
+		/**
+		 * todo: @julio check
+		 */
+		const [dir, filename] = data.name.split('com.jidadesarrollos.bovino/cache/');
+		this.files.set(filename, data.url);
+		this.triggerEvent('loadend');
+	};
+
+	get entries() {
+		return this.files;
+	}
+
+	get total() {
+		return this.files.size;
+	}
+}
+
+/**
+ * File: files\web.ts
+ */
+import { ReactiveModel } from '@beyond-js/reactive/model';
+import { BaseFile } from './base';
+
+export class WebFilesUploader extends BaseFile {}
+
+/**
+ * File: index.ts
+ */
+import { ReactiveModel } from "@beyond-js/reactive/model";
+import { DraggableUploader } from "./draggable";
+import { BaseFile } from "./files/base";
+import { FilesUploader } from "./files";
+import { XHRLoader } from "./xhr";
+import { mediaDevice } from "@aimpact/media-manager/main";
+
+interface IUploader {
+  files: BaseFile;
+}
+export /*bundle*/ class Uploader extends ReactiveModel<IUploader> {
+  #files: BaseFile;
+
+  get files() {
+    return this.#files;
+  }
+
+  #fileInput = document.createElement("input");
+  #selector: HTMLElement;
+  #attrs;
+  #draggable;
+  #control: HTMLElement;
+  #specs;
+  #errors;
+  get errors() {
+    return this.#errors;
+  }
+
+  constructor(specs: any = {}) {
+    super();
+
+    if (!specs.input) specs.input = {};
+
+    /**
+     * Manager of the files
+     * @type {UploadFiles}
+     */
+
+    this.#files = FilesUploader.getInstance(this, specs);
+
+    this.#draggable = new DraggableUploader(this);
+    globalThis.up = this;
+    this.#files.on("change", this.#listenChanges);
+    this.#files.on("error", this.getErrors);
+    this.#files.on("loadend", this.filesLoaded);
+    const params = { ...specs.input };
+    if (specs.hasOwnProperty("multiple")) params.multiple = specs.multiple;
+    this.#specs = specs;
+    this.setAttributes(params);
+  }
+
+  #listenChanges = () => {
+    this.fetching = this.#files.fetching;
+    this.ready = this.#files.ready;
+  };
+  setAttributes = (specs) => {
+    if (!specs) specs = {};
+
+    let attrs = {
+      type: "file",
+      style: "display:none",
+      name: "input_upload",
+      ...specs,
+    };
+    if (attrs.multiple) this.#fileInput.accept = "directory/*";
+
+    for (let prop in attrs) {
+      this.#fileInput.setAttribute(prop, attrs[prop]);
+    }
+
+    this.#attrs = attrs;
+  };
+
+  // };
+
+  openDialog = () => {
+    this.#fileInput.click();
+  };
+  filesLoaded = () => this.triggerEvent("loadend");
+  pictureLoaded = () => this.triggerEvent("pictureLoaded");
+  pictureLoading = () => this.triggerEvent("pictureLoading");
+  getErrors = () => (this.#errors = this.files.errors);
+
+  clean = async () => {
+    await this.#files.clean();
+    // await this.#mobileFiles.clean();
+  };
+
+  delete = async (fileName: string) => {
+    await this.#files.items.delete(fileName);
+    this.triggerEvent();
+  };
+
+  create = (
+    selector: HTMLElement,
+    draggableSelector: HTMLElement | undefined
+  ) => {
+    if (mediaDevice.type === "MOBILE") {
+      selector.addEventListener("click", mediaDevice.openGallery);
+    }
+    this.#selector = selector;
+    /**
+     * Adds de click and change events into the input file
+     */
+    const addListeners = () => {
+      if (!selector) return;
+      selector.addEventListener("click", this.openDialog);
+      this.#fileInput.addEventListener("change", this.#onChangeInput);
+    };
+
+    selector.after(this.#fileInput);
+    addListeners();
+    if (draggableSelector) this.#draggable.add(draggableSelector);
+  };
+  #onChangeInput = async (event) => {
+    this.clean();
+
+    this.fetching = true;
+    this.triggerEvent(); // todo: fetching property need to fires this event
+    const target = event.currentTarget;
+    window.setTimeout(async () => {
+      this.#files.total = target.files.length;
+      await this.#files.readLocal(target.files);
+      this.fetching = false;
+      this.triggerEvent(); // todo: fetching property need to fires this event
+    }, 0);
+  };
+
+  publish = async (additionalParams = {}) => {
+    const form = new FormData();
+    //const collection = isCamera ? mobileFiles : files;
+    const collection = this.#files;
+
+    const specs = this.#specs;
+    const name = collection.total > 1 ? `${specs.name}` : specs.name;
+
+    const items = collection.entries.map((item) => item);
+    form.append(name, JSON.stringify(items));
+    collection.entries.forEach((item) => form.append(name, item));
+
+    if (!specs.params) specs.params = {};
+    const params = { ...specs.params, ...additionalParams };
+
+    for (let param in params) {
+      if (!params.hasOwnProperty(param)) continue;
+      form.append(param, params[param]);
+    }
+
+    const xhr = new XHRLoader();
+    const response = await xhr.upload(form, specs.url);
+    return response.json();
+  };
+}
+
+/**
+ * File: resize.ts
+ */
+export const resizePicture = (uri, specs) =>
+	new Promise(resolve => {
+		specs = specs ? specs : {};
+
+		const maxWidth = specs.maxWidth ? specs.maxWidth : 800;
+		const maxHeight = specs.maxHeight ? specs.maxHeight : maxWidth / (4 / 3);
+		const quality = specs.quality ? specs.quality : 0.8;
+
+		const img = new Image();
+
+		img.src = uri;
+
+		img.onload = function () {
+			let width = img.width;
+			let height = img.height;
+			let orientation;
+
+			if (width < height) {
+				orientation = "portrait";
+				if (height > maxHeight) {
+					width *= maxHeight / height;
+					height = maxHeight;
+				}
+			} else {
+				orientation = "landscape";
+				if (width > maxWidth) {
+					height *= maxWidth / width;
+					width = maxWidth;
+				}
+			}
+
+			const canvas = document.createElement("canvas");
+			canvas.width = width;
+			canvas.height = height;
+
+			const ctx = canvas.getContext("2d");
+			ctx.drawImage(img, 0, 0, width, height);
+			let image = canvas.toDataURL("image/jpeg", quality);
+
+			if (!specs.rotate) {
+				resolve({
+					src: image,
+					width: width,
+					height: height,
+					orientation: orientation,
+				});
+			}
+
+			const rotateCanvas = document.createElement("canvas");
+			let ctxRotate = rotateCanvas.getContext("2d");
+
+			rotateCanvas.height = width;
+			rotateCanvas.width = height;
+			const imgRotate = new Image();
+
+			imgRotate.onload = () => {
+				ctxRotate.translate(rotateCanvas.width / 2, rotateCanvas.height / 2);
+				ctxRotate.rotate(Math.PI / 2);
+				ctxRotate.drawImage(imgRotate, -imgRotate.width / 2, -imgRotate.height / 2);
+				ctxRotate.rotate(-Math.PI / 2);
+				ctxRotate.translate(-imgRotate.width / 2, -imgRotate.height / 2);
+				const imageRotated = rotateCanvas.toDataURL("image/jpg", 1);
+				resolve({
+					src: imageRotated,
+					width: width,
+					height: height,
+					orientation: orientation,
+					aja: true,
+				});
+			};
+
+			imgRotate.src = image;
+		};
+	});
+
+/**
+ * File: xhr.ts
+ */
+import {PendingPromise} from '@beyond-js/kernel/core';
+import {ReactiveModel} from '@beyond-js/reactive/model';
+
+export /*bundle */ class XHRLoader extends ReactiveModel<XHRLoader> {
+	private promise: PendingPromise<any>;
+	private uploaded: boolean;
+	private progress: number;
+	private error: boolean;
+
+	constructor() {
+		super();
+		this.promise = undefined;
+		this.uploaded = false;
+		this.progress = 0;
+		this.error = false;
+	}
+
+	#bearer;
+	bearer(bearer: string | undefined) {
+		if (bearer) this.#bearer = bearer;
+		return this;
+	}
+
+	get uploading(): boolean {
+		return !!this.promise;
+	}
+
+	get isUploaded(): boolean {
+		return this.uploaded;
+	}
+
+	get uploadProgress(): number {
+		return this.progress;
+	}
+
+	get hasError(): boolean {
+		return this.error;
+	}
+
+	private onProgress(event: ProgressEvent): void {
+		if (event.lengthComputable) {
+			const percent = Math.round((event.loaded * 100) / event.total);
+			this.progress = parseInt(percent.toString());
+		}
+
+		this.triggerEvent('change');
+	}
+
+	private onCompleted(event: ProgressEvent): void {
+		this.uploaded = true;
+		this.promise.resolve();
+		this.triggerEvent('change');
+
+		setTimeout(() => {
+			this.promise = undefined;
+			this.triggerEvent('change');
+		}, 100);
+	}
+
+	private onError(event: ProgressEvent): void {
+		console.error('Error uploading picture', event);
+		this.error = true;
+		this.promise.reject();
+		this.triggerEvent('change');
+	}
+
+	private onAbort(): void {
+		this.promise.resolve(false);
+		this.triggerEvent('change');
+	}
+
+	getHeaders = (specs: any): Headers => {
+		let headers: Headers = new Headers();
+
+		const bearer = specs.bearer || this.#bearer;
+
+		if (bearer) {
+			headers.append('Authorization', `Bearer ${bearer}`);
+		}
+		if (specs.bearer) delete specs.bearer;
+
+		const keys: string[] = Object.keys(specs);
+		keys.forEach((key: string): void => {
+			if (key === 'bearer') return;
+			headers.append(key, specs[key]);
+		});
+		return headers;
+	};
+
+	public async upload(data: FormData, url: string): Promise<Response> {
+		try {
+			let headers = this.getHeaders({});
+			const specs = {
+				method: 'post',
+				headers,
+				body: data,
+			};
+			return fetch(url, specs);
+		} catch (e) {
+			console.error('error', e);
+		}
+	}
+
+	public abort(): void {
+		if (this.promise) {
+			this.promise.reject();
+			this.triggerEvent('change');
+		}
+	}
+}
+
