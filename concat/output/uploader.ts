@@ -109,7 +109,7 @@ export /*bundle*/ class Uploader extends ReactiveModel<IUploader> {
 		const target = event.currentTarget as HTMLInputElement;
 		window.setTimeout(async () => {
 			this.#files.total = target.files?.length || 0;
-			await this.#files.readLocal(Array.from(target.files ?? []));
+			await this.#files.readLocal(target.files ?? []);
 			this.fetching = false;
 			this.trigger(UploaderEvents.Change);
 		}, 0);

@@ -1,28 +1,31 @@
-// Tipos y enums para el uploader
+// Tipos y eventos expuestos por el uploader (sin lógica de red)
 
 export interface IUploaderSpecs {
-    url: string;
-    name: string;
-    input?: Partial<HTMLInputElement>;
-    multiple?: boolean;
-    params?: Record<string, any>;
-    chunked?: boolean; // Soporte de subida fragmentada
-    chunkSize?: number; // Tamaño del chunk en bytes
-    retries?: number; // Reintentos configurables
+	name: string;
+	input?: Partial<HTMLInputElement>;
+	multiple?: boolean;
+	params?: Record<string, any>;
+	accept?: string | string[]; // filtros opcionales por tipo
+	type?: string; // categoría predefinida: 'image', 'audio', etc.
+	maxSize?: number; // nuevo: en bytes (ej: 5 MB = 5 * 1024 * 1024)
 }
 
 export interface IUploaderEvents {
-    [UploaderEvents.LoadEnd]?: () => void;
-    [UploaderEvents.PictureLoaded]?: () => void;
-    [UploaderEvents.PictureLoading]?: () => void;
-    [UploaderEvents.Error]?: (error: any) => void;
-    [UploaderEvents.Change]?: () => void;
+	[UploaderEvents.LoadEnd]?: () => void;
+	[UploaderEvents.PictureLoaded]?: () => void;
+	[UploaderEvents.PictureLoading]?: () => void;
+	[UploaderEvents.Error]?: (error: any) => void;
+	[UploaderEvents.Change]?: () => void;
+	[UploaderEvents.Clean]?: () => void;
+	[UploaderEvents.Delete]?: () => void;
 }
 
 export enum UploaderEvents {
-    LoadEnd = 'loadend',
-    PictureLoaded = 'pictureLoaded',
-    PictureLoading = 'pictureLoading',
-    Error = 'error',
-    Change = 'change',
+	LoadEnd = 'loadend',
+	PictureLoaded = 'pictureLoaded',
+	PictureLoading = 'pictureLoading',
+	Error = 'error',
+	Change = 'change',
+	Clean = 'clean',
+	Delete = 'delete'
 }

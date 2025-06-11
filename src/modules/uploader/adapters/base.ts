@@ -68,41 +68,41 @@ export class BaseFilesList extends ReactiveModel<IFile> {
 
 	#onerror = (event: any) => console.error(4, event);
 
-	validateFile = (file: File) => {
-		// Si specs.accept está presente, usarlo para validar
+	validateFile = (file: File): boolean => {
+		const fileName = file.name.replace(INVALID_CHARS, '');
+
+		// Validación por "accept"
 		if (this.#accept) {
-			let acceptList: string[] = [];
-			if (typeof this.#accept === 'string') {
-				acceptList = [this.#accept];
-			} else if (Array.isArray(this.#accept)) {
-				acceptList = this.#accept;
-			}
-			const isValid = acceptList.some(accept => {
-				// Puede ser un MIME type exacto o extensión
-				if (accept.startsWith('.')) {
-					return file.name.endsWith(accept);
-				} else {
-					return file.type === accept;
-				}
+			const acceptList = Array.isArray(this.#accept) ? this.#accept : [this.#accept];
+			const matchesAccept = acceptList.some(accept => {
+				return accept.startsWith('.') ? file.name.endsWith(accept) : file.type === accept;
 			});
-			if (!isValid) {
-				this.#errors.push(`${file.name.replace(INVALID_CHARS, '')} (no permitido por accept)`);
+			if (!matchesAccept) {
+				this.#errors.push(`${fileName} (not allowed by accept rule)`);
+				this.trigger('validation:error', { file, reason: 'invalid-accept' });
+				return false;
 			}
-			return isValid;
 		}
 
-		// Si no hay tipo registrado, aceptar todo o lanzar error claro
-		if (!this.FILE_TYPE[this.#type]) {
-			// Puedes cambiar esto a lanzar un error si prefieres:
-			// throw new Error(`Tipo de archivo desconocido: ${this.#type}`);
-			return true;
+		// Validación por "type" predefinido si existe
+		if (this.#type !== 'any' && this.FILE_TYPE[this.#type]) {
+			const isValidType = this.FILE_TYPE[this.#type].includes(file.type);
+			if (!isValidType) {
+				this.#errors.push(`${fileName} (invalid MIME type)`);
+				this.trigger('validation:error', { file, reason: 'invalid-type' });
+				return false;
+			}
 		}
 
-		const isValid = !!this.FILE_TYPE[this.#type]?.find(item => item === file.type);
-		if (!isValid) {
-			this.#errors.push(`${file.name.replace(INVALID_CHARS, '')} (tipo no permitido)`);
+		// Validación por tamaño máximo
+		if (this.#specs?.maxSize && file.size > this.#specs.maxSize) {
+			const maxMb = (this.#specs.maxSize / (1024 * 1024)).toFixed(2);
+			this.#errors.push(`${fileName} (exceeds max size of ${maxMb} MB)`);
+			this.trigger('validation:error', { file, reason: 'max-size-exceeded' });
+			return false;
 		}
-		return isValid;
+
+		return true;
 	};
 
 	#readFile = async (file: File): Promise<void> => {
