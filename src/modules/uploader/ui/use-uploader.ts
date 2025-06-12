@@ -15,7 +15,7 @@ interface UseUploaderReturn {
 	clean: () => void;
 }
 
-export function useUploader(specs: IUploaderSpecs): UseUploaderReturn {
+export /*bundle*/ function useUploader(specs: IUploaderSpecs): UseUploaderReturn {
 	const triggerRef = React.useRef<HTMLElement>(null);
 	const dropZoneRef = React.useRef<HTMLElement>(null);
 
@@ -52,7 +52,7 @@ export function useUploader(specs: IUploaderSpecs): UseUploaderReturn {
 	return {
 		triggerRef,
 		dropZoneRef,
-		files: uploader.files,
+		files: uploader.files.items,
 		uploader,
 		uploading,
 		progress,
