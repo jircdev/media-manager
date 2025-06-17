@@ -1,6 +1,5 @@
-import { ReactiveModel } from '@beyond-js/reactive/model';
-import type { Uploader } from '.';
-import type { WebFilesUploader } from './adapters/web';
+import type { Uploader } from '../';
+import type { WebFilesUploader } from '../adapters/web';
 
 export class DraggableUploader {
 	#parent: Uploader;

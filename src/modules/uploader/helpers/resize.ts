@@ -1,5 +1,24 @@
 import { getExifOrientation } from './exif-orientation';
 
+// Declaración global completa para OffscreenCanvas con propiedades y métodos usados
+// Esto evita errores de tipo en TypeScript
+
+declare global {
+	interface OffscreenCanvas extends EventTarget {
+		width: number;
+		height: number;
+		getContext(contextId: '2d', options?: any): CanvasRenderingContext2D | null;
+		getContext(contextId: 'webgl', options?: any): WebGLRenderingContext | null;
+		getContext(contextId: 'webgl2', options?: any): WebGL2RenderingContext | null;
+		transferToImageBitmap(): ImageBitmap;
+		convertToBlob(options?: { type?: string; quality?: number }): Promise<Blob>;
+	}
+	var OffscreenCanvas: {
+		prototype: OffscreenCanvas;
+		new (width: number, height: number): OffscreenCanvas;
+	};
+}
+
 export interface IResizeSpecs {
 	maxWidth?: number;
 	maxHeight?: number;
@@ -122,7 +141,7 @@ export async function resizePicture(url: string, specs?: IResizeSpecs): Promise<
 
 	// Export canvas as base64-encoded image
 	let src: string;
-	if (canvas instanceof OffscreenCanvas) {
+	if (canvas instanceof OffscreenCanvas && typeof canvas.convertToBlob === 'function') {
 		const finalBlob = await canvas.convertToBlob({
 			type: outputType,
 			quality
@@ -133,7 +152,9 @@ export async function resizePicture(url: string, specs?: IResizeSpecs): Promise<
 			reader.readAsDataURL(finalBlob);
 		});
 	} else {
-		src = (canvas as HTMLCanvasElement).toDataURL(outputType, quality);
+		// Fallback para navegadores sin convertToBlob
+		const dataUrl = (canvas as HTMLCanvasElement).toDataURL(outputType, quality);
+		src = dataUrl;
 	}
 
 	return { src, width, height, orientation };

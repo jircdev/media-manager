@@ -4,6 +4,7 @@ export interface IUploaderSpecs {
 	name: string;
 	input?: Partial<HTMLInputElement>;
 	multiple?: boolean;
+	base64?: boolean; // defines if the File object will generate a base64 string
 	params?: Record<string, any>;
 	accept?: string | string[]; // filtros opcionales por tipo
 	type?: string; // categoría predefinida: 'image', 'audio', etc.
