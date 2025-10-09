@@ -13,17 +13,17 @@ interface UseUploaderReturn {
 	errors: string[];
 	openDialog: () => void;
 	clean: () => void;
+	count: number;
 }
 
 export /*bundle*/ function useUploader(specs: IUploaderSpecs): UseUploaderReturn {
 	const triggerRef = React.useRef<HTMLElement>(null);
 	const dropZoneRef = React.useRef<HTMLElement>(null);
-
 	const [uploader] = React.useState(() => new Uploader(specs));
 	const [uploading, setUploading] = React.useState(false);
 	const [progress, setProgress] = React.useState(0);
 	const [errors, setErrors] = React.useState<string[]>([]);
-
+	const [count, setCount] = React.useState(0);
 	React.useEffect(() => {
 		if (!triggerRef.current) return;
 
@@ -31,6 +31,7 @@ export /*bundle*/ function useUploader(specs: IUploaderSpecs): UseUploaderReturn
 
 		const handleChange = () => {
 			setUploading(uploader.fetching);
+			setCount(count => count + 1);
 			setProgress(
 				uploader.files.total > 0 ? Math.round((uploader.files.items.size / uploader.files.total) * 100) : 0
 			);
@@ -55,6 +56,7 @@ export /*bundle*/ function useUploader(specs: IUploaderSpecs): UseUploaderReturn
 		files: uploader.files.items,
 		uploader,
 		uploading,
+		count,
 		progress,
 		errors,
 		openDialog: uploader.openDialog,

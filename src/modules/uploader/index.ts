@@ -1,25 +1,41 @@
-import { DraggableUploader } from './ui/draggable';
 import { ReactiveModel } from '@beyond-js/reactive/model';
 import { FilesUploader } from './adapters';
 import { BaseFilesList } from './adapters/base';
-import { IUploaderSpecs, UploaderEvents } from './types';
+import {
+	IBaseFile,
+	IFileProcessor,
+	IFileValidator,
+	IUploaderSpecs,
+	ProcessorSpec,
+	UploaderEvents,
+	ValidatorSpec
+} from './core/types';
+import { DraggableUploader } from './inputs/draggable';
+import { InputHandler } from './inputs/input';
+import { Registry } from './core/registry';
+import { ImageValidator } from './validators/image';
+import { ImageProcessor } from './processors/image';
 
 interface IUploader {
 	files: BaseFilesList;
 }
+// Register built-in validator/processor once
+Registry.registerValidator('image', ImageValidator);
+Registry.registerProcessor('image', ImageProcessor);
 
 /**
- * Clase central que permite gestionar archivos locales.
- * No realiza subidas, solo gestiona selección, validación y vistas previas.
- */
-export /*bundle*/ class Uploader extends ReactiveModel<IUploader> {
+ * Orchestrator class for file management.
+ * Delegates file selection to InputHandler/DraggableUploader,
+ * validation/processing to external strategies,
+ * and state storage to BaseFilesList.
+ */ export /*bundle*/ class Uploader extends ReactiveModel<IUploader> {
 	#files: BaseFilesList;
-	#fileInput = document.createElement('input');
-	#draggable;
-	#attrs;
-	#selector: HTMLElement;
-	#specs;
-	#errors;
+	#draggable?: DraggableUploader;
+	#inputHandler?: InputHandler;
+	#specs: IUploaderSpecs;
+	#validators: IFileValidator[] = [];
+	#processors: IFileProcessor[] = [];
+	#errors: any;
 
 	get files() {
 		return this.#files;
@@ -30,17 +46,38 @@ export /*bundle*/ class Uploader extends ReactiveModel<IUploader> {
 
 	constructor(specs: IUploaderSpecs = {} as IUploaderSpecs) {
 		super();
-		if (!specs.input) specs.input = {};
 		this.#specs = specs;
-		this.#files = FilesUploader.getInstance(this, specs);
-		this.#draggable = new DraggableUploader(this, this.#files);
 
+		this.#validators = this.#resolveValidators(specs.validators);
+		this.#processors = this.#resolveProcessors(specs.processors);
+
+		this.#files = FilesUploader.getInstance();
 		this.#files.on(UploaderEvents.Change, this.#listenChanges);
-		this.#files.on(UploaderEvents.Error, this.getErrors);
-		this.#files.on(UploaderEvents.LoadEnd, this.filesLoaded);
+		this.#files.on(UploaderEvents.LoadEnd, this.#filesLoaded);
+	}
 
-		const params = { ...specs.input, multiple: specs.multiple ?? false };
-		this.setAttributes(params);
+	#resolveValidators(validators?: ValidatorSpec[]): IFileValidator[] {
+		if (!Array.isArray(validators) || validators.length === 0) return [];
+
+		return validators
+			.map(v => {
+				if (typeof v === 'string') return Registry.getValidator(v);
+				if (typeof v === 'object' && 'name' in v) return Registry.getValidator(v.name, v.options);
+				return v as IFileValidator;
+			})
+			.filter(Boolean) as IFileValidator[];
+	}
+
+	#resolveProcessors(processors?: ProcessorSpec[]): IFileProcessor[] {
+		if (!Array.isArray(processors) || processors.length === 0) return [];
+
+		return processors
+			.map(p => {
+				if (typeof p === 'string') return Registry.getProcessor(p);
+				if (typeof p === 'object' && 'name' in p) return Registry.getProcessor(p.name, p.options);
+				return p as IFileProcessor;
+			})
+			.filter(Boolean) as IFileProcessor[];
 	}
 
 	#listenChanges = () => {
@@ -48,29 +85,61 @@ export /*bundle*/ class Uploader extends ReactiveModel<IUploader> {
 		this.ready = this.#files.ready;
 	};
 
-	setAttributes = (specs: Partial<HTMLInputElement> & { multiple?: boolean }) => {
-		const attrs = {
-			type: 'file',
-			style: 'display:none',
-			name: 'input_upload',
-			...specs
-		};
-		this.#fileInput.multiple = specs.multiple ?? false;
-		for (let prop in attrs) {
-			this.#fileInput.setAttribute(prop, attrs[prop]);
-		}
-		this.#attrs = attrs;
+	#filesLoaded = () => this.trigger(UploaderEvents.LoadEnd);
+
+	/**
+	 * Initialize input and/or draggable handlers.
+	 */
+	create = (trigger?: HTMLElement, draggableSelector?: HTMLElement) => {
+		if (trigger) this.#setupInputHandler(trigger);
+		if (draggableSelector) this.#setupDraggable(draggableSelector);
 	};
 
-	openDialog = () => this.#fileInput.click();
-	filesLoaded = () => this.trigger(UploaderEvents.LoadEnd);
-	pictureLoaded = () => this.trigger(UploaderEvents.PictureLoaded);
-	pictureLoading = () => this.trigger(UploaderEvents.PictureLoading);
-	getErrors = () => (this.#errors = this.files.errors);
+	#setupInputHandler(trigger: HTMLElement) {
+		this.#inputHandler = new InputHandler({
+			trigger,
+			multiple: this.#specs.multiple ?? false,
+			accept: this.#specs.accept
+		});
+
+		this.#inputHandler.on('onFiles', async files => {
+			await this.clean();
+			this.fetching = true;
+			this.trigger(UploaderEvents.Change);
+
+			const added = this.#files.addFiles(files);
+			await this.#processFiles(added);
+
+			this.fetching = false;
+			this.trigger(UploaderEvents.Change);
+		});
+
+		this.#inputHandler.on('onError', error => {
+			this.trigger(UploaderEvents.Error, error);
+		});
+	}
+
+	#setupDraggable(draggableSelector: HTMLElement) {
+		this.#draggable = new DraggableUploader();
+		this.#draggable.add(draggableSelector);
+	}
+
+	async #processFiles(files: IBaseFile[]) {
+		for (const file of files) {
+			try {
+				for (const validator of this.#validators) await validator.validate(file);
+				for (const processor of this.#processors) await processor.process(file);
+				this.#files.updateStatus(file.id, 'ready');
+			} catch (err) {
+				this.#files.updateStatus(file.id, 'error', (err as Error).message);
+			}
+		}
+	}
 
 	clean = async () => {
 		await this.#files.clean();
 		this.trigger(UploaderEvents.Clean);
+		this.trigger('change');
 	};
 
 	delete = async (fileName: string) => {
@@ -79,39 +148,10 @@ export /*bundle*/ class Uploader extends ReactiveModel<IUploader> {
 	};
 
 	destroy = () => {
-		if (this.#selector) this.#selector.removeEventListener('click', this.openDialog);
-		this.#fileInput.removeEventListener('change', this.#onChangeInput);
-		this.#draggable?.remove();
+		this.#inputHandler?.destroy();
+		this.#draggable?.destroy();
+
 		this.#files.off(UploaderEvents.Change, this.#listenChanges);
-		this.#files.off(UploaderEvents.Error, this.getErrors);
-		this.#files.off(UploaderEvents.LoadEnd, this.filesLoaded);
-	};
-
-	create = (selector: HTMLElement, draggableSelector?: HTMLElement) => {
-		this.#selector = selector;
-
-		const addListeners = () => {
-			if (!selector) return;
-			selector.addEventListener('click', this.openDialog);
-			this.#fileInput.addEventListener('change', this.#onChangeInput);
-		};
-
-		selector.after(this.#fileInput);
-		addListeners();
-		if (draggableSelector) this.#draggable.add(draggableSelector);
-	};
-
-	#onChangeInput = async (event: Event) => {
-		this.clean();
-		this.fetching = true;
-		this.trigger(UploaderEvents.Change);
-
-		const target = event.currentTarget as HTMLInputElement;
-		window.setTimeout(async () => {
-			this.#files.total = target.files?.length || 0;
-			await this.#files.readLocal(Array.from(target.files ?? []));
-			this.fetching = false;
-			this.trigger(UploaderEvents.Change);
-		}, 0);
+		this.#files.off(UploaderEvents.LoadEnd, this.#filesLoaded);
 	};
 }

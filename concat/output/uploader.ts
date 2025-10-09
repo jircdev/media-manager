@@ -1,163 +1,93 @@
 /**
  * File: adapters\base.ts
  */
+/**
+ * File: adapters/base-files-list.ts
+ * Universal file list manager (agnostic to file type).
+ */
+
 import { ReactiveModel } from '@beyond-js/reactive/model';
-import { INVALID_CHARS } from '../common/regex';
+import { FileStatus, IBaseFile } from '../core/types';
 
-export interface IFileItem {
-	file: File;
-	src?: string;
-}
+export class BaseFilesList extends ReactiveModel<{}> {
+	#map = new Map<string, IBaseFile>();
+	#total: number = 0;
 
-interface IFile {}
-export class BaseFilesList extends ReactiveModel<IFile> {
-	#loaded: number = 0;
+	get total(): number {
+		return this.#total;
+	}
 
-	#specs: any;
-	#type: string;
-	#accept: string | string[] | null = null;
-	#errors: any[] = [];
-	get errors() {
-		return this.#errors;
+	get items(): IBaseFile[] {
+		return [...this.#map.values()];
 	}
-	protected _total: number = 0;
-	get total() {
-		return this._total;
-	}
-	set total(value) {
-		if (value === this._total) return;
-		this._total = value;
-	}
-	#map = new Map<string, IFileItem>();
-	get map() {
+
+	get map(): Map<string, IBaseFile> {
 		return this.#map;
 	}
-	get items(): IFileItem[] {
-		return [...this.#map.values()];
-	}
-
-	get entries(): IFileItem[] {
-		return [...this.#map.values()];
-	}
-
-	constructor(parent: any, specs: any) {
-		super();
-		this.#specs = specs;
-		this.#type = specs.type ? specs.type : 'any';
-		// Permitir accept como string o string[]
-		this.#accept = specs.accept || null;
-	}
-
-	// Registro extensible de tipos de archivo
-	protected FILE_TYPE: Record<string, string[]> = {
-		document: [
-			'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-			'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-			'text/plain',
-			'application/pdf'
-		],
-		image: ['image/png', 'image/jpeg', 'image/gif'],
-		json: ['application/json'],
-		zip: ['application/x-zip-compressed'],
-		audio: ['audio/mpeg', 'audio/ogg', 'audio/wav', 'audio/webm', 'audio/aac', 'audio/flac', 'audio/x-m4a']
-	};
-
-	public registerFileType(category: string, mimes: string[]): void {
-		if (!this.FILE_TYPE[category]) this.FILE_TYPE[category] = [];
-		this.FILE_TYPE[category].push(...mimes);
-	}
-
-	// Métodos onload/onloadend eliminados: la lógica ahora está en #readFile
-
-	#onerror = (event: any) => console.error(4, event);
-
-	validateFile = (file: File): boolean => {
-		const fileName = file.name.replace(INVALID_CHARS, '');
-
-		// Validación por "accept"
-		if (this.#accept) {
-			const acceptList = Array.isArray(this.#accept) ? this.#accept : [this.#accept];
-			const matchesAccept = acceptList.some(accept => {
-				return accept.startsWith('.') ? file.name.endsWith(accept) : file.type === accept;
-			});
-			if (!matchesAccept) {
-				this.#errors.push(`${fileName} (not allowed by accept rule)`);
-				this.trigger('validation:error', { file, reason: 'invalid-accept' });
-				return false;
-			}
-		}
-
-		// Validación por "type" predefinido si existe
-		if (this.#type !== 'any' && this.FILE_TYPE[this.#type]) {
-			const isValidType = this.FILE_TYPE[this.#type].includes(file.type);
-			if (!isValidType) {
-				this.#errors.push(`${fileName} (invalid MIME type)`);
-				this.trigger('validation:error', { file, reason: 'invalid-type' });
-				return false;
-			}
-		}
-
-		// Validación por tamaño máximo
-		if (this.#specs?.maxSize && file.size > this.#specs.maxSize) {
-			const maxMb = (this.#specs.maxSize / (1024 * 1024)).toFixed(2);
-			this.#errors.push(`${fileName} (exceeds max size of ${maxMb} MB)`);
-			this.trigger('validation:error', { file, reason: 'max-size-exceeded' });
-			return false;
-		}
-
-		return true;
-	};
-
-	#readFile = async (file: File): Promise<void> => {
-		if (this.#type !== 'any') {
-			const isValid = this.validateFile(file);
-			if (!isValid) {
-				this.trigger('validation:error', { file, reason: 'invalid-type' });
-				return;
-			}
-		}
-
-		const name = file.name.replace(INVALID_CHARS, '');
-		// Limpiar src anterior si existe
-		const prev = this.#map.get(name);
-		if (prev && prev.src) URL.revokeObjectURL(prev.src);
-
-		const src = URL.createObjectURL(file);
-		this.#map.set(name, { file, src });
-		this.#loaded++;
-
-		this.trigger('file:loaded', { file, src });
-		// Revocar el objectURL tras emitir file:loaded si no se necesita la vista previa
-		URL.revokeObjectURL(src);
-		if (this.#loaded === this.#map.size) {
-			this.trigger('all:loaded', { files: this.entries });
-		}
-	};
-
-	#validateLoad = () => {
-		if (this.#loaded === this.#map.size) {
-		}
-	};
-
-	clean = () => {
-		// Liberar los objectURL creados
-		for (const item of this.#map.values()) {
-			if (item.src) URL.revokeObjectURL(item.src);
-		}
-		this.#map = new Map();
-		this.#loaded = 0;
-		this.trigger('clean');
-	};
 
 	/**
-	 *
-	 * @param fileList
+	 * Add new files to the list. Files are created with "pending" status.
 	 */
-	readLocal = async (fileList: File[]) => {
-		this.fetching = true;
-		await Promise.all(Array.from(fileList).map(file => this.#readFile(file)));
-		this.fetching = false;
-	};
+	addFiles(files: File[]): IBaseFile[] {
+		const added: IBaseFile[] = [];
+
+		for (const file of files) {
+			const id = crypto.randomUUID();
+			const item: IBaseFile = {
+				id,
+				name: file.name,
+				size: file.size,
+				type: file.type,
+				file,
+				status: 'pending'
+			};
+			this.#map.set(id, item);
+			added.push(item);
+		}
+
+		this.#total = this.#map.size;
+		this.trigger('add', added);
+		this.trigger('change', this.items);
+
+		return added;
+	}
+
+	/**
+	 * Remove a file by ID.
+	 */
+	remove(id: string): boolean {
+		const removed = this.#map.delete(id);
+		if (removed) {
+			this.#total = this.#map.size;
+			this.trigger('remove', id);
+			this.trigger('change', this.items);
+		}
+		return removed;
+	}
+
+	/**
+	 * Clean all files.
+	 */
+	async clean(): Promise<void> {
+		this.#map.clear();
+		this.#total = 0;
+		this.trigger('clean');
+		this.trigger('change', []);
+	}
+
+	/**
+	 * Update the status of a file.
+	 */
+	updateStatus(id: string, status: FileStatus, error?: string): void {
+		const item = this.#map.get(id);
+		if (!item) return;
+
+		item.status = status;
+		if (error) item.error = error;
+
+		this.trigger('update', item);
+		this.trigger('change', this.items);
+	}
 }
 
 /**
@@ -177,129 +107,6 @@ export class FilesUploader extends ReactiveModel<FilesUploader> {
 }
 
 /**
- * File: adapters\mobile.ts
- */
-import { ReactiveModel } from '@beyond-js/reactive/model';
-
-export class MobileFilesUploader extends ReactiveModel<MobileFilesUploader> {
-	private _loaded: number = 0;
-	private files = new Map();
-	private base64?: string;
-	private _specs: any;
-	private _errors: any[] = [];
-
-	constructor(specs: any) {
-		super();
-		this._specs = specs;
-	}
-
-	clean = () => {
-		// Liberar los objectURL creados
-		for (const value of this.files.values()) {
-			if (value && typeof value === 'object' && value.objectUrl) {
-				URL.revokeObjectURL(value.objectUrl);
-			}
-		}
-		this.files = new Map();
-		this._loaded = 0;
-	};
-
-	/**
-	 * Valida el archivo usando la lógica de BaseFile (MIME y extensión)
-	 */
-	validateFile = (file: { name: string; type?: string }) => {
-		const accept = this._specs?.accept || null;
-		const type = this._specs?.type || 'any';
-		const FILE_TYPE: Record<string, string[]> = {
-			document: [
-				'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-				'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-				'text/plain',
-				'application/pdf'
-			],
-			image: ['image/png', 'image/jpeg', 'image/gif'],
-			json: ['application/json'],
-			zip: ['application/x-zip-compressed'],
-			audio: ['audio/mpeg', 'audio/ogg', 'audio/wav', 'audio/webm', 'audio/aac', 'audio/flac', 'audio/x-m4a']
-		};
-		if (accept) {
-			let acceptList: string[] = [];
-			if (typeof accept === 'string') {
-				acceptList = [accept];
-			} else if (Array.isArray(accept)) {
-				acceptList = accept;
-			}
-			const isValid = acceptList.some(a => {
-				if (a.startsWith('.')) return file.name.endsWith(a);
-				else return file.type === a;
-			});
-			if (!isValid) this._errors.push(`${file.name} (no permitido por accept)`);
-			return isValid;
-		}
-		if (!FILE_TYPE[type]) return true;
-		const isValid = !!FILE_TYPE[type]?.find(item => item === file.type);
-		if (!isValid) this._errors.push(`${file.name} (tipo no permitido)`);
-		return isValid;
-	};
-
-	/**
-	 * data: { url: string (base64 o file url), name: string, type?: string }
-	 */
-	getFiles = async (data: any) => {
-		this.clean();
-		this.base64 = data.url;
-		this.trigger('loading');
-
-		const [dir, filename] = data.name.split('com.jidadesarrollos.bovino/cache/');
-		const fileType = data.type || '';
-		const fileName = filename || data.name;
-
-		// Validación de tipo MIME/extensión
-		if (!this.validateFile({ name: fileName, type: fileType })) {
-			this._errors.push('Archivo no válido por tipo/aceptación');
-			this.trigger('validation:error', { file: { name: fileName, type: fileType }, reason: 'invalid-type' });
-			return;
-		}
-
-		let fileEntry: any = { name: fileName, type: fileType };
-		// Si es base64, convertir a Blob y luego a objectURL
-		if (typeof data.url === 'string' && data.url.startsWith('data:')) {
-			try {
-				const arr = data.url.split(',');
-				const mime = arr[0].match(/:(.*?);/)[1];
-				const bstr = atob(arr[1]);
-				let n = bstr.length;
-				const u8arr = new Uint8Array(n);
-				while (n--) u8arr[n] = bstr.charCodeAt(n);
-				const blob = new Blob([u8arr], { type: mime });
-				const objectUrl = URL.createObjectURL(blob);
-				fileEntry = { ...fileEntry, blob, objectUrl };
-			} catch (e) {
-				this._errors.push('Error convirtiendo base64 a Blob');
-				fileEntry = { ...fileEntry, src: data.url };
-			}
-		} else {
-			// Si ya viene como file url, dejarlo igual
-			fileEntry = { ...fileEntry, src: data.url };
-		}
-		this.files.set(fileName, fileEntry);
-		this.trigger('loadend');
-	};
-
-	get entries() {
-		return this.files;
-	}
-
-	get total() {
-		return this.files.size;
-	}
-
-	get errors() {
-		return this._errors;
-	}
-}
-
-/**
  * File: adapters\web.ts
  */
 import { ReactiveModel } from '@beyond-js/reactive/model';
@@ -308,351 +115,63 @@ import { BaseFilesList } from './base';
 export class WebFilesUploader extends BaseFilesList {}
 
 /**
- * File: common\regex.ts
+ * File: core\registry.ts
  */
-// Expresiones regulares comunes para el uploader
-export const INVALID_CHARS = /[^\w\d.]/g;
+// core/registry.ts
+import { IFileValidator, IFileProcessor } from './types';
+// registry.ts (already exists, unchanged except clarifying return types)
+export class Registry {
+	static validators: Record<string, new (options?: any) => IFileValidator> = {};
+	static processors: Record<string, new (options?: any) => IFileProcessor> = {};
 
-/**
- * File: helpers\exif-orientation.ts
- */
-/**
- * Extracts the EXIF Orientation value from a JPEG image's binary data.
- *
- * The EXIF Orientation tag (0x0112) indicates the correct orientation of the image
- * (e.g. normal, rotated 90°, 180°, etc.). This is especially important for displaying
- * images taken on mobile devices where the physical rotation of the camera is stored
- * as metadata instead of modifying the pixel data.
- *
- * @param {ArrayBuffer} arrayBuffer - The binary content of a JPEG image.
- * @returns {number} A number from 1 to 8 representing the orientation according to the EXIF standard:
- *  - 1: Normal (no rotation)
- *  - 3: Rotated 180°
- *  - 6: Rotated 90° clockwise
- *  - 8: Rotated 90° counterclockwise
- *  - Other values may exist but are less commonly used.
- *  - Returns 1 if the orientation tag is not present, if the file is not a JPEG,
- *    or if parsing fails.
- *
- * @example
- * const buffer = await file.arrayBuffer();
- * const orientation = getExifOrientation(buffer);
- * if (orientation === 6) {
- *   // Rotate image 90° clockwise
- * }
- */
-export function getExifOrientation(arrayBuffer: ArrayBuffer): number {
-	const view = new DataView(arrayBuffer);
-	if (view.getUint16(0, false) !== 0xffd8) return 1; // Not JPEG
-	let offset = 2;
-	const length = view.byteLength;
-
-	while (offset < length) {
-		if (view.getUint16(offset + 2, false) <= 8) return 1;
-		const marker = view.getUint16(offset, false);
-		offset += 2;
-
-		if (marker === 0xffe1) {
-			if (view.getUint32((offset += 2), false) !== 0x45786966) return 1; // "Exif"
-			const little = view.getUint16((offset += 6), false) === 0x4949;
-			offset += view.getUint32(offset + 4, little);
-			const tags = view.getUint16(offset, little);
-			offset += 2;
-
-			for (let i = 0; i < tags; i++) {
-				if (view.getUint16(offset + i * 12, little) === 0x0112) {
-					return view.getUint16(offset + i * 12 + 8, little);
-				}
-			}
-		} else if ((marker & 0xff00) !== 0xff00) break;
-		else offset += view.getUint16(offset, false);
+	static registerValidator(name: string, validator: new (options?: any) => IFileValidator) {
+		this.validators[name] = validator;
 	}
 
-	return 1;
+	static registerProcessor(name: string, processor: new (options?: any) => IFileProcessor) {
+		this.processors[name] = processor;
+	}
+
+	static getValidator(name: string, options?: any): IFileValidator | undefined {
+		const V = this.validators[name];
+		return V ? new V(options) : undefined;
+	}
+
+	static getProcessor(name: string, options?: any): IFileProcessor | undefined {
+		const P = this.processors[name];
+		return P ? new P(options) : undefined;
+	}
 }
 
 /**
- * File: helpers\resize.ts
- */
-import { getExifOrientation } from './exif-orientation';
-
-export interface IResizeSpecs {
-	maxWidth?: number;
-	maxHeight?: number;
-	quality?: number;
-	outputType?: 'image/jpeg' | 'image/png' | 'image/webp';
-}
-
-export interface IResizedImage {
-	src: string;
-	width: number;
-	height: number;
-	orientation: number;
-}
-
-/**
- * Resizes and re-encodes an image given its URL.
- *
- * This function downloads an image, detects its EXIF orientation metadata, applies basic rotation,
- * resizes it proportionally to fit within specified maxWidth and maxHeight, and returns a base64-encoded version
- * in the selected format.
- *
- * **Limitations:**
- * - Transparency is lost when using `image/jpeg` (default). Use `image/png` if you need transparency.
- * - Some browsers may not support `image/webp` or `OffscreenCanvas`.
- * - EXIF orientation support is limited to 1 (normal), 3, 6, and 8.
- * - The original format is not preserved unless explicitly set via `outputType`.
- *
- * @param {string} url - The image URL to load.
- * @param {IResizeSpecs} specs - Optional resizing and output settings.
- * @returns {Promise<IResizedImage>} A resized, re-encoded image result.
- */
-export async function resizePicture(url: string, specs?: IResizeSpecs): Promise<IResizedImage> {
-	specs = specs || {};
-	const maxWidth = specs.maxWidth || 800;
-	const maxHeight = specs.maxHeight || maxWidth / (4 / 3);
-	const quality = specs.quality || 0.8;
-
-	// Default to JPEG if not provided
-	const supportedTypes = ['image/jpeg', 'image/png', 'image/webp'];
-	const outputType = supportedTypes.includes(specs.outputType as string) ? specs.outputType! : 'image/jpeg';
-
-	// Download the image as Blob and ArrayBuffer
-	const response = await fetch(url);
-	const blob = await response.blob();
-	const arrayBuffer = await blob.arrayBuffer();
-
-	// Extract EXIF orientation metadata
-	const orientation = getExifOrientation(arrayBuffer);
-
-	// Create image source (ImageBitmap or <img> element fallback)
-	let imageBitmap: ImageBitmap | HTMLImageElement;
-	try {
-		if ('createImageBitmap' in window) {
-			imageBitmap = await createImageBitmap(blob, {
-				imageOrientation: 'none'
-			} as any);
-		} else {
-			throw new Error();
-		}
-	} catch {
-		imageBitmap = await new Promise<HTMLImageElement>((resolve, reject) => {
-			const img = new Image();
-			img.onload = () => resolve(img);
-			img.onerror = reject;
-			img.src = url;
-		});
-	}
-
-	let width = imageBitmap.width;
-	let height = imageBitmap.height;
-
-	// Proportional resize based on aspect ratio
-	if (width < height && height > maxHeight) {
-		width = Math.round((width * maxHeight) / height);
-		height = maxHeight;
-	} else if (width >= height && width > maxWidth) {
-		height = Math.round((height * maxWidth) / width);
-		width = maxWidth;
-	}
-
-	// Prepare canvas
-	const useOffscreen = typeof OffscreenCanvas !== 'undefined';
-	let canvas: HTMLCanvasElement | OffscreenCanvas;
-
-	canvas = useOffscreen ? new OffscreenCanvas(width, height) : document.createElement('canvas');
-
-	canvas.width = width;
-	canvas.height = height;
-
-	const ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
-	if (!ctx) throw new Error('Unable to get 2D context');
-
-	// Apply basic EXIF rotation
-	switch (orientation) {
-		case 3:
-			ctx.translate(width, height);
-			ctx.rotate(Math.PI);
-			break;
-		case 6:
-			[width, height] = [height, width];
-			canvas.width = width;
-			canvas.height = height;
-			ctx.translate(width, 0);
-			ctx.rotate(Math.PI / 2);
-			break;
-		case 8:
-			[width, height] = [height, width];
-			canvas.width = width;
-			canvas.height = height;
-			ctx.translate(0, height);
-			ctx.rotate(-Math.PI / 2);
-			break;
-		default:
-			if (orientation !== 1) {
-				console.warn(`Unsupported EXIF orientation: ${orientation}`);
-			}
-	}
-
-	ctx.drawImage(imageBitmap, 0, 0, width, height);
-
-	// Export canvas as base64-encoded image
-	let src: string;
-	if (canvas instanceof OffscreenCanvas) {
-		const finalBlob = await canvas.convertToBlob({
-			type: outputType,
-			quality
-		});
-		src = await new Promise<string>(resolve => {
-			const reader = new FileReader();
-			reader.onload = () => resolve(reader.result as string);
-			reader.readAsDataURL(finalBlob);
-		});
-	} else {
-		src = (canvas as HTMLCanvasElement).toDataURL(outputType, quality);
-	}
-
-	return { src, width, height, orientation };
-}
-
-/**
- * File: index.ts
- */
-import { DraggableUploader } from './ui/draggable';
-import { ReactiveModel } from '@beyond-js/reactive/model';
-import { FilesUploader } from './adapters';
-import { BaseFilesList } from './adapters/base';
-import { IUploaderSpecs, UploaderEvents } from './types';
-
-interface IUploader {
-	files: BaseFilesList;
-}
-
-/**
- * Clase central que permite gestionar archivos locales.
- * No realiza subidas, solo gestiona selección, validación y vistas previas.
- */
-export /*bundle*/ class Uploader extends ReactiveModel<IUploader> {
-	#files: BaseFilesList;
-	#fileInput = document.createElement('input');
-	#draggable;
-	#attrs;
-	#selector: HTMLElement;
-	#specs;
-	#errors;
-
-	get files() {
-		return this.#files;
-	}
-	get errors() {
-		return this.#errors;
-	}
-
-	constructor(specs: IUploaderSpecs = {} as IUploaderSpecs) {
-		super();
-		if (!specs.input) specs.input = {};
-		this.#specs = specs;
-		this.#files = FilesUploader.getInstance(this, specs);
-		this.#draggable = new DraggableUploader(this, this.#files);
-
-		this.#files.on(UploaderEvents.Change, this.#listenChanges);
-		this.#files.on(UploaderEvents.Error, this.getErrors);
-		this.#files.on(UploaderEvents.LoadEnd, this.filesLoaded);
-
-		const params = { ...specs.input, multiple: specs.multiple ?? false };
-		this.setAttributes(params);
-	}
-
-	#listenChanges = () => {
-		this.fetching = this.#files.fetching;
-		this.ready = this.#files.ready;
-	};
-
-	setAttributes = (specs: Partial<HTMLInputElement> & { multiple?: boolean }) => {
-		const attrs = {
-			type: 'file',
-			style: 'display:none',
-			name: 'input_upload',
-			...specs
-		};
-		this.#fileInput.multiple = specs.multiple ?? false;
-		for (let prop in attrs) {
-			this.#fileInput.setAttribute(prop, attrs[prop]);
-		}
-		this.#attrs = attrs;
-	};
-
-	openDialog = () => this.#fileInput.click();
-	filesLoaded = () => this.trigger(UploaderEvents.LoadEnd);
-	pictureLoaded = () => this.trigger(UploaderEvents.PictureLoaded);
-	pictureLoading = () => this.trigger(UploaderEvents.PictureLoading);
-	getErrors = () => (this.#errors = this.files.errors);
-
-	clean = async () => {
-		await this.#files.clean();
-		this.trigger(UploaderEvents.Clean);
-	};
-
-	delete = async (fileName: string) => {
-		await this.#files.map.delete(fileName);
-		this.trigger(UploaderEvents.Delete);
-	};
-
-	destroy = () => {
-		if (this.#selector) this.#selector.removeEventListener('click', this.openDialog);
-		this.#fileInput.removeEventListener('change', this.#onChangeInput);
-		this.#draggable?.remove();
-		this.#files.off(UploaderEvents.Change, this.#listenChanges);
-		this.#files.off(UploaderEvents.Error, this.getErrors);
-		this.#files.off(UploaderEvents.LoadEnd, this.filesLoaded);
-	};
-
-	create = (selector: HTMLElement, draggableSelector?: HTMLElement) => {
-		this.#selector = selector;
-
-		const addListeners = () => {
-			if (!selector) return;
-			selector.addEventListener('click', this.openDialog);
-			this.#fileInput.addEventListener('change', this.#onChangeInput);
-		};
-
-		selector.after(this.#fileInput);
-		addListeners();
-		if (draggableSelector) this.#draggable.add(draggableSelector);
-	};
-
-	#onChangeInput = async (event: Event) => {
-		this.clean();
-		this.fetching = true;
-		this.trigger(UploaderEvents.Change);
-
-		const target = event.currentTarget as HTMLInputElement;
-		window.setTimeout(async () => {
-			this.#files.total = target.files?.length || 0;
-			await this.#files.readLocal(Array.from(target.files ?? []));
-			this.fetching = false;
-			this.trigger(UploaderEvents.Change);
-		}, 0);
-	};
-}
-
-/**
- * File: types.ts
+ * File: core\types.ts
  */
 // Tipos y eventos expuestos por el uploader (sin lógica de red)
+export type FileStatus = 'pending' | 'validating' | 'ready' | 'uploading' | 'done' | 'error';
 
-export interface IUploaderSpecs {
+export interface IBaseFile {
+	id: string;
 	name: string;
-	input?: Partial<HTMLInputElement>;
+	size: number;
+	type: string;
+	file: File;
+	previewUrl?: string;
+	status: FileStatus;
+	error?: string;
+	meta?: Record<string, any>;
+}
+export type ValidatorSpec = IFileValidator | string | { name: string; options?: Record<string, any> };
+
+export type ProcessorSpec = IFileProcessor | string | { name: string; options?: Record<string, any> };
+
+export /*bundle*/ interface IUploaderSpecs {
 	multiple?: boolean;
-	base64?: boolean; // defines if the File object will generate a base64 string
-	params?: Record<string, any>;
-	accept?: string | string[]; // filtros opcionales por tipo
-	type?: string; // categoría predefinida: 'image', 'audio', etc.
-	maxSize?: number; // nuevo: en bytes (ej: 5 MB = 5 * 1024 * 1024)
+	accept?: string | string[];
+	validators?: ValidatorSpec[]; // now supports many
+	processors?: ProcessorSpec[]; // now supports many
 }
 
-export interface IUploaderEvents {
+export /*bundle*/ interface IUploaderEvents {
 	[UploaderEvents.LoadEnd]?: () => void;
 	[UploaderEvents.PictureLoaded]?: () => void;
 	[UploaderEvents.PictureLoading]?: () => void;
@@ -672,8 +191,186 @@ export enum UploaderEvents {
 	Delete = 'delete'
 }
 
+// core/types.ts
+
+export /*bundle*/ interface IFileValidator {
+	validate(file: IBaseFile): Promise<void>;
+}
+
+export /*bundle*/ interface IFileProcessor {
+	process(file: IBaseFile): Promise<void>;
+}
+export /*bundle*/ interface IImageFile extends IBaseFile {
+	meta: {
+		preview: { width: number; height: number };
+	};
+	toBase64: () => Promise<string>;
+}
+
 /**
- * File: ui\draggable.ts
+ * File: index.ts
+ */
+import { ReactiveModel } from '@beyond-js/reactive/model';
+import { FilesUploader } from './adapters';
+import { BaseFilesList } from './adapters/base';
+import {
+	IBaseFile,
+	IFileProcessor,
+	IFileValidator,
+	IUploaderSpecs,
+	ProcessorSpec,
+	UploaderEvents,
+	ValidatorSpec
+} from './core/types';
+import { DraggableUploader } from './inputs/draggable';
+import { InputHandler } from './inputs/input';
+import { Registry } from './core/registry';
+import { ImageValidator } from './validators/image';
+import { ImageProcessor } from './processors/image';
+
+interface IUploader {
+	files: BaseFilesList;
+}
+// Register built-in validator/processor once
+Registry.registerValidator('image', ImageValidator);
+Registry.registerProcessor('image', ImageProcessor);
+
+/**
+ * Orchestrator class for file management.
+ * Delegates file selection to InputHandler/DraggableUploader,
+ * validation/processing to external strategies,
+ * and state storage to BaseFilesList.
+ */ export /*bundle*/ class Uploader extends ReactiveModel<IUploader> {
+	#files: BaseFilesList;
+	#draggable?: DraggableUploader;
+	#inputHandler?: InputHandler;
+	#specs: IUploaderSpecs;
+	#validators: IFileValidator[] = [];
+	#processors: IFileProcessor[] = [];
+	#errors: any;
+
+	get files() {
+		return this.#files;
+	}
+	get errors() {
+		return this.#errors;
+	}
+
+	constructor(specs: IUploaderSpecs = {} as IUploaderSpecs) {
+		super();
+		this.#specs = specs;
+
+		this.#validators = this.#resolveValidators(specs.validators);
+		this.#processors = this.#resolveProcessors(specs.processors);
+
+		this.#files = FilesUploader.getInstance(this, specs);
+		this.#files.on(UploaderEvents.Change, this.#listenChanges);
+		this.#files.on(UploaderEvents.LoadEnd, this.#filesLoaded);
+	}
+
+	#resolveValidators(validators?: ValidatorSpec[]): IFileValidator[] {
+		if (!Array.isArray(validators) || validators.length === 0) return [];
+
+		return validators
+			.map(v => {
+				if (typeof v === 'string') return Registry.getValidator(v);
+				if (typeof v === 'object' && 'name' in v) return Registry.getValidator(v.name, v.options);
+				return v as IFileValidator;
+			})
+			.filter(Boolean) as IFileValidator[];
+	}
+
+	#resolveProcessors(processors?: ProcessorSpec[]): IFileProcessor[] {
+		if (!Array.isArray(processors) || processors.length === 0) return [];
+
+		return processors
+			.map(p => {
+				if (typeof p === 'string') return Registry.getProcessor(p);
+				if (typeof p === 'object' && 'name' in p) return Registry.getProcessor(p.name, p.options);
+				return p as IFileProcessor;
+			})
+			.filter(Boolean) as IFileProcessor[];
+	}
+
+	#listenChanges = () => {
+		this.fetching = this.#files.fetching;
+		this.ready = this.#files.ready;
+	};
+
+	#filesLoaded = () => this.trigger(UploaderEvents.LoadEnd);
+
+	/**
+	 * Initialize input and/or draggable handlers.
+	 */
+	create = (trigger?: HTMLElement, draggableSelector?: HTMLElement) => {
+		if (trigger) this.#setupInputHandler(trigger);
+		if (draggableSelector) this.#setupDraggable(draggableSelector);
+	};
+
+	#setupInputHandler(trigger: HTMLElement) {
+		this.#inputHandler = new InputHandler({
+			trigger,
+			multiple: this.#specs.multiple ?? false,
+			accept: this.#specs.accept
+		});
+
+		this.#inputHandler.on('onFiles', async files => {
+			await this.clean();
+			this.fetching = true;
+			this.trigger(UploaderEvents.Change);
+
+			const added = this.#files.addFiles(files);
+			await this.#processFiles(added);
+
+			this.fetching = false;
+			this.trigger(UploaderEvents.Change);
+		});
+
+		this.#inputHandler.on('onError', error => {
+			this.trigger(UploaderEvents.Error, error);
+		});
+	}
+
+	#setupDraggable(draggableSelector: HTMLElement) {
+		this.#draggable = new DraggableUploader(this, this.#files);
+		this.#draggable.add(draggableSelector);
+	}
+
+	async #processFiles(files: IBaseFile[]) {
+		for (const file of files) {
+			try {
+				console.log(0.3, this.#validators, this.#processors, file);
+				for (const validator of this.#validators) await validator.validate(file);
+				for (const processor of this.#processors) await processor.process(file);
+				this.#files.updateStatus(file.id, 'ready');
+			} catch (err) {
+				this.#files.updateStatus(file.id, 'error', (err as Error).message);
+			}
+		}
+	}
+
+	clean = async () => {
+		await this.#files.clean();
+		this.trigger(UploaderEvents.Clean);
+		this.trigger('change');
+	};
+
+	delete = async (fileName: string) => {
+		await this.#files.map.delete(fileName);
+		this.trigger(UploaderEvents.Delete);
+	};
+
+	destroy = () => {
+		this.#inputHandler?.destroy();
+		this.#draggable?.remove();
+
+		this.#files.off(UploaderEvents.Change, this.#listenChanges);
+		this.#files.off(UploaderEvents.LoadEnd, this.#filesLoaded);
+	};
+}
+
+/**
+ * File: inputs\draggable.ts
  */
 import type { Uploader } from '../';
 import type { WebFilesUploader } from '../adapters/web';
@@ -741,69 +438,275 @@ export class DraggableUploader {
 }
 
 /**
- * File: ui\use-uploader.ts
+ * File: inputs\input.ts
  */
-import * as React from 'react';
-import { UploaderEvents, IUploaderSpecs } from '../types';
-import { Uploader } from '../index';
-import { BaseFilesList } from '../adapters/base';
+/**
+ * File: inputs/input-handler.ts
+ * Encapsula el <input type="file"> y expone eventos normalizados
+ */
 
-interface UseUploaderReturn {
-	triggerRef: React.RefObject<HTMLElement>;
-	dropZoneRef: React.RefObject<HTMLElement>;
-	files: BaseFilesList;
-	uploader: Uploader;
-	uploading: boolean;
-	progress: number;
-	errors: string[];
-	openDialog: () => void;
-	clean: () => void;
+import { ReactiveModel } from '@beyond-js/reactive/model';
+
+export interface IInputHandlerSpecs {
+	multiple?: boolean;
+	accept?: string | string[];
+	capture?: boolean | string;
+	trigger: string | HTMLElement; // selector o elemento que dispara el diálogo
 }
 
-export /*bundle*/ function useUploader(specs: IUploaderSpecs): UseUploaderReturn {
-	const triggerRef = React.useRef<HTMLElement>(null);
-	const dropZoneRef = React.useRef<HTMLElement>(null);
+export interface IInputHandlerEvents {
+	onFiles?: (files: File[]) => void;
+	onError?: (error: Error) => void;
+}
 
-	const [uploader] = React.useState(() => new Uploader(specs));
-	const [uploading, setUploading] = React.useState(false);
-	const [progress, setProgress] = React.useState(0);
-	const [errors, setErrors] = React.useState<string[]>([]);
+export class InputHandler extends ReactiveModel<IInputHandlerEvents> {
+	#input: HTMLInputElement;
+	#trigger: HTMLElement;
+	#specs: IInputHandlerSpecs;
 
-	React.useEffect(() => {
-		if (!triggerRef.current) return;
+	constructor(specs: IInputHandlerSpecs) {
+		super();
+		this.#specs = specs;
 
-		uploader.create(triggerRef.current, dropZoneRef.current ?? undefined);
+		// Guard clauses
+		if (!specs.trigger) {
+			throw new Error('InputHandler requires a trigger element or selector.');
+		}
 
-		const handleChange = () => {
-			setUploading(uploader.fetching);
-			setProgress(
-				uploader.files.total > 0 ? Math.round((uploader.files.items.size / uploader.files.total) * 100) : 0
-			);
-		};
+		this.#trigger = typeof specs.trigger === 'string' ? document.querySelector(specs.trigger) : specs.trigger;
 
-		const handleError = () => {
-			setErrors([...uploader.errors]);
-		};
+		if (!this.#trigger) {
+			throw new Error('Trigger element not found.');
+		}
 
-		uploader.on(UploaderEvents.Change, handleChange);
-		uploader.on(UploaderEvents.Error, handleError);
-		uploader.on(UploaderEvents.LoadEnd, handleChange);
+		// Crear input oculto
+		this.#input = document.createElement('input');
+		this.#input.type = 'file';
+		this.#input.style.display = 'none';
 
-		return () => {
-			uploader.destroy();
-		};
-	}, [uploader]);
+		if (specs.multiple) this.#input.multiple = true;
+		if (specs.accept) {
+			this.#input.accept = Array.isArray(specs.accept) ? specs.accept.join(',') : specs.accept;
+		}
+		if (specs.capture) {
+			(this.#input as any).capture = specs.capture;
+		}
 
-	return {
-		triggerRef,
-		dropZoneRef,
-		files: uploader.files.items,
-		uploader,
-		uploading,
-		progress,
-		errors,
-		openDialog: uploader.openDialog,
-		clean: uploader.clean
+		this.#input.addEventListener('change', this.#onChange);
+		this.#trigger.addEventListener('click', this.open);
+
+		//insert after the trigger
+		this.#trigger.after(this.#input);
+	}
+
+	#onChange = () => {
+		const files = this.#input.files ? Array.from(this.#input.files) : [];
+		if (!files.length) return;
+
+		try {
+			this.trigger('onFiles', files);
+		} catch (error) {
+			this.trigger('onError', error as Error);
+		} finally {
+			this.#input.value = ''; // reset
+		}
 	};
+
+	open = (): void => {
+		this.#input.click();
+	};
+
+	destroy(): void {
+		this.#input.removeEventListener('change', this.#onChange);
+		this.#trigger.removeEventListener('click', this.open);
+		if (this.#input.parentNode) {
+			this.#input.parentNode.removeChild(this.#input);
+		}
+	}
+}
+
+/**
+ * File: loader\xhr.ts
+ */
+import { PendingPromise } from '@beyond-js/kernel/core';
+import { ReactiveModel } from '@beyond-js/reactive/model';
+
+export /*bundle */ class XHRLoader extends ReactiveModel<XHRLoader> {
+	private promise: PendingPromise<any>;
+	private uploaded: boolean;
+	private progress: number;
+	private error: boolean;
+
+	constructor() {
+		super();
+		this.promise = undefined;
+		this.uploaded = false;
+		this.progress = 0;
+		this.error = false;
+	}
+
+	#bearer;
+	bearer(bearer: string | undefined) {
+		if (bearer) this.#bearer = bearer;
+		return this;
+	}
+
+	get uploading(): boolean {
+		return !!this.promise;
+	}
+
+	get isUploaded(): boolean {
+		return this.uploaded;
+	}
+
+	get uploadProgress(): number {
+		return this.progress;
+	}
+
+	get hasError(): boolean {
+		return this.error;
+	}
+
+	private onProgress(event: ProgressEvent): void {
+		if (event.lengthComputable) {
+			const percent = Math.round((event.loaded * 100) / event.total);
+			this.progress = parseInt(percent.toString());
+		}
+
+		this.trigger('change');
+	}
+
+	private onCompleted(event: ProgressEvent): void {
+		this.uploaded = true;
+		this.promise.resolve();
+		this.trigger('change');
+
+		setTimeout(() => {
+			this.promise = undefined;
+			this.trigger('change');
+		}, 100);
+	}
+
+	private onError(event: ProgressEvent): void {
+		console.error('Error uploading picture', event);
+		this.error = true;
+		this.promise.reject();
+		this.trigger('change');
+	}
+
+	private onAbort(): void {
+		this.promise.resolve(false);
+		this.trigger('change');
+	}
+
+	getHeaders = (specs: any): Headers => {
+		let headers: Headers = new Headers();
+
+		const bearer = specs.bearer || this.#bearer;
+
+		if (bearer) {
+			headers.append('Authorization', `Bearer ${bearer}`);
+		}
+		if (specs.bearer) delete specs.bearer;
+
+		const keys: string[] = Object.keys(specs);
+		keys.forEach((key: string): void => {
+			if (key === 'bearer') return;
+			headers.append(key, specs[key]);
+		});
+		return headers;
+	};
+
+	public async upload(data: FormData, url: string): Promise<Response> {
+		try {
+			let headers = this.getHeaders({});
+			const specs = {
+				method: 'post',
+				headers,
+				body: data
+			};
+			return fetch(url, specs);
+		} catch (e) {
+			console.error('error', e);
+		}
+	}
+
+	public abort(): void {
+		if (this.promise) {
+			this.promise.reject();
+			this.trigger('change');
+		}
+	}
+}
+
+/**
+ * File: processors\image.ts
+ */
+// processors/image.ts
+import { IImageFile, IBaseFile, IFileProcessor } from '../core/types';
+
+export /*bundle*/ class ImageProcessor implements IFileProcessor {
+	async process(file: IBaseFile): Promise<void> {
+		const previewUrl = URL.createObjectURL(file.file);
+		file.previewUrl = previewUrl;
+		console.log(0.2, file.previewUrl);
+		const dimensions = await this.getDimensions(previewUrl);
+
+		const imageFile = file as IImageFile;
+		imageFile.meta = { preview: { width: dimensions.width, height: dimensions.height } };
+		imageFile.toBase64 = () => this.toBase64(file.file);
+	}
+
+	private getDimensions(src: string): Promise<{ width: number; height: number }> {
+		return new Promise((resolve, reject) => {
+			const img = new Image();
+			img.onload = () => resolve({ width: img.width, height: img.height });
+			img.onerror = () => reject(new Error('Could not load image dimensions'));
+			img.src = src;
+		});
+	}
+
+	private toBase64(file: File): Promise<string> {
+		return new Promise((resolve, reject) => {
+			const reader = new FileReader();
+			reader.onload = () => resolve(reader.result as string);
+			reader.onerror = err => reject(err);
+			reader.readAsDataURL(file);
+		});
+	}
+}
+
+/**
+ * File: validators\image.ts
+ */
+// validators/image.ts
+import { IBaseFile } from '../core/types';
+import { IFileValidator } from '../core/types';
+
+export interface IImageValidatorOptions {
+	maxSize?: number; // in MB
+	allowedTypes?: string[];
+}
+
+export class ImageValidator implements IFileValidator {
+	#options: IImageValidatorOptions;
+
+	constructor(options: IImageValidatorOptions = {}) {
+		this.#options = options;
+	}
+
+	async validate(file: IBaseFile): Promise<void> {
+		if (!file.type.startsWith('image/')) {
+			throw new Error(`File "${file.name}" is not a valid image`);
+		}
+
+		if (this.#options.allowedTypes && !this.#options.allowedTypes.includes(file.type)) {
+			throw new Error(`File type "${file.type}" not allowed`);
+		}
+
+		if (this.#options.maxSize && file.size > this.#options.maxSize * 1024 * 1024) {
+			throw new Error(`File "${file.name}" exceeds max size of ${this.#options.maxSize} MB`);
+		}
+	}
 }
 
